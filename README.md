@@ -14,7 +14,7 @@ In complex monorepos, starting your development environment can be a chore. You 
 
 *   **Unified Configuration:** Define all your services, their modes (e.g., `dev`, `docker`, `serve`), and dependencies in a single `go-dev.yml` file.
 *   **Service Types:**
-    *   **`cmd` services:** Run any command-line process (e.g., `npm run dev`, `rollup -w`, `python app.py`). Supports `preCommands` for setup tasks like builds.
+    *   **`cmd` services:** Run any command-line process (e.g., `npm run dev`, `rollup -w`, `python app.py`). Supports `preCommands` for setup tasks like builds. Commands can be defined in multiple flexible ways to run single or multiple processes in parallel for a service.
     *   **`docker` services:** Manage Docker containers via `docker compose`. Automatically checks container status and performs health checks.
 *   **Mode-Aware Dependencies:** Services can depend on other services running in specific modes (e.g., your `api` dev mode might depend on `frontend` in `serve` mode).
 *   **Preset-Driven Startup:** Define different "presets" (e.g., `api`, `frontend`, `all`) to easily spin up specific combinations of services tailored to your current development focus.
@@ -54,15 +54,35 @@ npx go-dev <preset_name> [config_path]
 *   `<preset_name>`: The name of the preset defined in your `go-dev.yml` (e.g., `api`, `frontend`, `all`).
 *   `[config_path]`: (Optional) Path to your `go-dev.yml` file. Defaults to looking for `go-dev.yml`, `.go-dev.yml`, `go-dev.yaml`, or `.go-dev.yaml` in the current directory.
 
-**Example:**
+**Passing Arguments to Service Commands:**
+
+To pass additional arguments from the command line to a specific service command, use a keyword flag followed by the target and its arguments.
+
+By default, the keyword flag is `--args-for`. This can be customized in your `go-dev.yml` using the `serviceArgsKeyword` option (e.g., `serviceArgsKeyword: pass-to`).
+
+The target for arguments is specified as `<service_name>[:<command_index>]`:
+
+Specify the target for arguments as `<service_name>:<command_index>` (e.g., `api:0`, `frontend:1`). The `command_index` is 0-based and refers to the position of the command within a service's `commands` array. If the `:<command_index>` part is omitted (e.g., just `<service_name>`), arguments are passed to the **first command (index `0`)** defined for that service.
+
+You can combine multiple keyword flag blocks for different services or specific commands.
 
 ```bash
-npx go-dev api       # Start the environment for API development
-npx go-dev frontend  # Start the environment for Frontend development
-npx go-dev all       # Start the full development environment
+npx go-dev <preset_name> [--<serviceArgsKeyword> <service_name>[:<command_index>] [args...] ] [...]
 ```
 
-`go-dev` will automatically exit once all primary services (those directly listed in your chosen preset) have completed their execution cleanly. If you need to stop `go-dev` before all services complete, possibly because you're running a web service, press `Ctrl+C` at any time to gracefully shut down all running services.
+Example:
+
+Consider an `api` service with two parallel commands: `api:0` (main server) and `api:1` (TypeScript compiler watch).
+
+```bash
+npx go-dev all \
+  --args-for api:0 --host 0.0.0.0 --port 8081 \
+  --args-for api:1 --pretty --diagnostics \
+  --args-for frontend --log-level verbose
+```
+*In the example above, `--args-for frontend` is equivalent to `--args-for frontend:0`.*
+
+Press `Ctrl+C` at any time to gracefully shut down all running services. `go-dev` will also automatically exit once all primary services (those directly listed in your chosen preset) have completed their execution cleanly.
 
 ## ⚙️ Configuration (`go-dev.yml`)
 
@@ -74,6 +94,10 @@ Common examples include: `go-dev.yml`, `.go-dev.yml`, and `go-dev.config.yaml`.
 
 ```yaml
 # go-dev.yml
+
+# Customize the keyword used to pass arguments to service commands from the CLI.
+# Change this if 'args-for' conflicts with a command your services use.
+serviceArgsKeyword: args-for # Default value
 
 # Define your individual services here
 services:
@@ -93,9 +117,22 @@ services:
       # API in active development mode (runs directly on host)
       dev:
         type: cmd             # This mode runs a command-line process
+        # The 'commands' property can be specified in three ways:
+        # 1. As a simple array of strings (for a single command without extra options)
+        #    commands: [npx, rollup, -c, -w]
+        # 2. As a single command object (for one command with options like 'directory' or 'restartOnError')
+        #    commands:
+        #      command: [npx, rollup, -c, -w]
+        #      directory: ./api
+        #      restartOnError: true # Default is true for 'cmd' services
+        # 3. As an array of command objects (for multiple parallel commands)
         commands:
-          command: [npx, rollup, -c, -w] # The primary command for development
-          directory: ./api      # Directory to run the command from
+          - command: [npx, rollup, -c, -w] # The primary command for development (index 0)
+            directory: ./api      # Directory to run the command from
+            # restartOnError: true # (Optional, defaults to true)
+          # Example of a second parallel command for API (index 1)
+          # - command: [npx, tsc, --watch]
+          #   directory: ./api
         dependencies:         # What this mode depends on
           - postgres          # API dev needs PostgreSQL (will use postgres's default docker mode)
           - { service: frontend, mode: serve } # API dev needs frontend running in its 'serve' mode
