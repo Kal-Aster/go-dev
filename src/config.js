@@ -112,8 +112,6 @@ function loadConfig(configPath) {
   const configContent = fs.readFileSync(configPath, 'utf8');
   const config = yaml.load(configContent);
 
-  console.log(config.services.api.modes);
-  
   const { error, value } = configSchema.validate(config);
   
   if (error) {

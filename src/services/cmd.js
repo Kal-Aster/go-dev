@@ -60,13 +60,43 @@ class CmdService extends BaseService {
     const useProcessIndex = cmdArgs.length > 1;
     const exitedProcess = Array.from({ length: cmdArgs.length });
     for (let index = 0; index < cmdArgs.length; index++) {
-      const command = cmdArgs[index];
+      const [command, ...args] = cmdArgs[index];
 
-      const extraArgs = this.extraArgs?.[index] ?? [];
+      const extraArgs = (this.extraArgs?.[index] ?? []).slice();
+
+      const finalArgs = args.map(arg => {
+        const regex = /(\\*)\$arg/g;
+
+        let indexesToReplace = [];
+        while (true) {
+          const match = regex.exec(arg);
+          if (match == null) {
+            break;
+          }
+
+          const backslashes = match[1];
+          if (backslashes.length % 2 === 1) {
+            continue;
+          }
+
+          const replacement = extraArgs.shift() ?? '';
+          indexesToReplace.unshift({
+            index: match.index + backslashes.length,
+            replacement,
+          });
+        }
+
+        indexesToReplace.forEach(({ index, replacement }) => {
+          console.log(arg.slice(0, index));
+          arg = arg.slice(0, index) + replacement + arg.slice(index + 4);
+        });
+
+        return arg;
+      }).concat(extraArgs);
 
       const process = CmdService._processManager.startManagedProcess(
-        command[0],
-        command.slice(1).concat(extraArgs),
+        command,
+        finalArgs,
         { cwd: directory[index] },
         (useProcessIndex ?
           `${this.prefix}${index}:` :
