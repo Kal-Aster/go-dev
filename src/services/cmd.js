@@ -58,6 +58,7 @@ class CmdService extends BaseService {
     );
 
     const useProcessIndex = cmdArgs.length > 1;
+    const exitedProcess = Array.from({ length: cmdArgs.length });
     for (let index = 0; index < cmdArgs.length; index++) {
       const command = cmdArgs[index];
 
@@ -70,7 +71,14 @@ class CmdService extends BaseService {
           this.prefix
         ),
         restartOnError[index],
-        () => this.onExit?.()
+        () => {
+          exitedProcess[index] = true;
+          if (exitedProcess.some(exited => !exited)) {
+            return;
+          }
+
+          this.onExit?.();
+        }
       );
   
       if (!process) {
