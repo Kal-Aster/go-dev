@@ -15,6 +15,7 @@ const commandSchema = Joi.array().items(Joi.string().min(1)).min(1);
 const commandObjectSchema = Joi.object({
     command: commandSchema,
     directory: Joi.string().min(1).optional(),
+    restartOnError: Joi.boolean().optional(),
 })
 const commandConfigSchema = Joi.alternatives().try(
     commandSchema,
@@ -109,6 +110,8 @@ function loadConfig(configPath) {
   
   const configContent = fs.readFileSync(configPath, 'utf8');
   const config = yaml.load(configContent);
+
+  console.log(config.services.api.modes);
   
   const { error, value } = configSchema.validate(config);
   

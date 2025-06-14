@@ -41,31 +41,35 @@ class CmdService extends BaseService {
       console.log(`[${this.name}:${this.mode}] Pre-commands completed.`);
     }
 
-    const { cmdArgs, directory } = (Array.isArray(commands) && typeof commands[0] === 'string' ?
-      { cmdArgs: [commands], directory: [undefined] } :
+    const { cmdArgs, directory, restartOnError } = (Array.isArray(commands) && typeof commands[0] === 'string' ?
+      { cmdArgs: [commands], directory: [undefined], restartOnError: [undefined] } :
       (Array.isArray(commands) ?
         {
           cmdArgs: commands.map(({ command }) => command),
           directory: commands.map(({ directory }) => directory),
+          restartOnError: commands.map(({ restartOnError }) => restartOnError),
         } :
-        { cmdArgs: [commands.command], directory: [commands.directory] }
+        {
+          cmdArgs: [commands.command],
+          directory: [commands.directory],
+          restartOnError: [commands.restartOnError],
+        }
       )
     );
 
     const useProcessIndex = cmdArgs.length > 1;
     for (let index = 0; index < cmdArgs.length; index++) {
       const command = cmdArgs[index];
-      const cwd = directory[index];
 
       const process = CmdService._processManager.startManagedProcess(
         command[0],
         command.slice(1),
-        { cwd },
+        { cwd: directory[index] },
         (useProcessIndex ?
           `${this.prefix}${index}:` :
           this.prefix
         ),
-        true,
+        restartOnError[index],
         () => this.onExit?.()
       );
   

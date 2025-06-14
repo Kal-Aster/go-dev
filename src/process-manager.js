@@ -174,6 +174,8 @@ class ProcessManager {
             `[ProcessManager] Restarting managed process '${command}'...`,
           );
           this.startManagedProcess(command, args, options, prefix, restartOnError, onExit, processReference);
+        } else {
+          onExit?.();
         }
       } else {
         console.log(
