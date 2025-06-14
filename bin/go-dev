@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+
+const Orchestrator = require('../src/orchestrator');
+const path = require('path');
+
+const presetName = process.argv[2];
+const configPath = process.argv[3];
+
+if (!presetName) {
+    console.error('Error: Please specify a preset to run. Usage: dev-orchestrator <preset_name> [config_path]');
+    process.exit(1);
+}
+
+const orchestrator = new Orchestrator(configPath);
+
+orchestrator.start(presetName);
