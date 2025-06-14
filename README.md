@@ -70,13 +70,30 @@ You can combine multiple keyword flag blocks for different services or specific 
 npx go-dev <preset_name> [--<serviceArgsKeyword> <service_name>[:<command_index>] [args...] ] [...]
 ```
 
-Example:
+**How Arguments are Applied to `cmd` Service Commands:**
 
-Consider an `api` service with two parallel commands: `api:0` (main server) and `api:1` (TypeScript compiler watch).
+When arguments are passed to a `cmd` type service command, `go-dev` processes them in a special way:
+
+1.  **Placeholder Substitution:**
+    *   The command array (e.g., `[npx, tsx, ./src/$arg.ts]`) is scanned for the special placeholder `$arg`.
+    *   Each occurrence of `$arg` is replaced, in order, by an argument from the `[args...]` provided on the command line.
+    *   Example: A command `[npx, tsx, ./src/$arg.ts]` with extra arguments `[index, -w]` will become `[npx, tsx, ./src/index.ts, -w]`.
+
+2.  **Escaped Placeholders:**
+    *   If you need a literal `$arg` in your command that should *not* be substituted, escape it with a backslash: `\$arg`.
+    *   Example: A command `[echo, \$arg]` with no extra arguments will result in `[echo, $arg]`.
+
+3.  **Remaining Arguments:**
+    *   Any arguments from `[args...]` that were *not* used to substitute an `$arg` placeholder will be **appended** to the end of the command array.
+    *   Example: A command `[echo, $arg, fixed]` with extra arguments `[first, second, third]` will become `[echo, first, fixed, second, third]`. Here, `first` replaces `$arg`, and `second`, `third` are appended.
+
+**Full Example:**
+
+Consider an `api` service with two parallel commands: `api:0` (main server, using `$arg`) and `api:1` (TypeScript compiler watch).
 
 ```bash
 npx go-dev all \
-  --args-for api:0 --host 0.0.0.0 --port 8081 \
+  --args-for api:0 main-entrypoint --host 0.0.0.0 --port 8081 \
   --args-for api:1 --pretty --diagnostics \
   --args-for frontend --log-level verbose
 ```
