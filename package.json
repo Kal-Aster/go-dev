@@ -9,6 +9,10 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Giuliano Collacchioni",
+  "repository": {
+    "type": "github",
+    "url": "https://github.com/Kal-Aster/go-dev"
+  },
   "license": "MIT",
   "description": "",
   "dependencies": {
