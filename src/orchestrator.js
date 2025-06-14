@@ -33,6 +33,63 @@ class Orchestrator {
       console.log('--- Resolved Primary Services to Run ---');
       primaryServices.forEach(s => console.log(` - ${s.name} (mode: ${s.mode})`));
 
+      const extraArgs = new Map();
+      {
+        const argsToParse = process.argv.slice(3);
+        if (argsToParse.length > 0) {
+          console.log(`--- Gathering args to pass to services ---`);
+          const serviceArgsKeyword = `--${this.config.serviceArgsKeyword ?? 'args-for'}`;
+          let isGettingService = false;
+          let currentService = null;
+          let currentIndex = 0;
+          let argsToPass = null;
+          for (const arg of argsToParse) {
+            if (arg === serviceArgsKeyword) {
+              isGettingService = true;
+              currentService = null;
+              currentIndex = 0;
+              continue;
+            }
+            if (currentService == null) {
+              if (isGettingService === false) {
+                throw new Error(`Invalid arguments, use format: npx go-dev ${presetName} ${serviceArgsKeyword} <service> <args>`);
+              }
+
+              const splitArg = arg.split(':');
+              if (splitArg.length > 2) {
+                throw new Error(`Invalid service name + index '${arg}': should be <service> or <service>:<command_index>`);
+              }
+
+              const index = splitArg.length > 1 ? parseInt(splitArg[1]) : 0;;
+              if (splitArg.length > 1 && `${index}` !== splitArg[1]) {
+                throw new Error(`Invalid service name + index '${arg}': should be <service> or <service>:<command_index>`);
+              }
+
+              currentService = splitArg[0];
+              currentIndex = index;
+              argsToPass = extraArgs.get(currentService) ?? [];
+              extraArgs.set(currentService, argsToPass);
+              isGettingService = false;
+              continue;
+            }
+
+            let args = argsToPass[currentIndex];
+            if (args == null) {
+              args = [];
+              argsToPass[currentIndex] = args;
+            }
+
+            args.push(arg);
+          }
+
+          for (const [service, indexedArgs] of extraArgs.entries()) {
+            indexedArgs.forEach((args, index) => {
+              console.log(`Extra args for service '${service}:${index}': [${args.join(', ')}]`);
+            });
+          }
+        }
+      }
+
       console.log('\n--- Starting Dependencies ---');
       for (const { name, mode, config } of dependencies) {
         if (this.activeServiceInstances.has(name)) {
@@ -67,7 +124,7 @@ class Orchestrator {
           }
 
           this.cleanup();
-        });
+        }, extraArgs.get(name));
         this.activeServiceInstances.set(name, serviceInstance);
         activePrimaryServices.set(name, serviceInstance);
         primaryServicePromises.push(serviceInstance.start());

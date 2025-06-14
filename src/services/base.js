@@ -28,11 +28,12 @@ class BaseService {
    * @param {string} mode - The resolved mode for this service (e.g., 'dev', 'docker', 'serve').
    * @param {object} config - The concrete configuration object for this service and mode.
    */
-  constructor(name, mode, config, onExit) {
+  constructor(name, mode, config, onExit, extraArgs) {
     this.name = name;
     this.mode = mode;
     this.config = config;
     this.onExit = onExit;
+    this.extraArgs = extraArgs;
   }
 
   async start() {

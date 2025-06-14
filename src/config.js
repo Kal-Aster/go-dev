@@ -60,6 +60,7 @@ const serviceSchema = Joi.alternatives().try(
 );
 
 const configSchema = Joi.object({
+  serviceArgsKeyword: Joi.string().min(1).optional(),
   services: Joi.object().pattern(Joi.string(), serviceSchema).required(),
   presets: Joi.object().pattern(
     Joi.string(),

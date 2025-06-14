@@ -1,8 +1,8 @@
 const { BaseService } = require('./base');
 
 class CmdService extends BaseService {
-  constructor(name, mode, config, onExit) {
-    super(name, mode, config, onExit);
+  constructor(name, mode, config, onExit, extraArgs) {
+    super(name, mode, config, onExit, extraArgs);
     this.prefix = `${name}:${mode}:`;
     this.processes = [];
   }
@@ -62,9 +62,11 @@ class CmdService extends BaseService {
     for (let index = 0; index < cmdArgs.length; index++) {
       const command = cmdArgs[index];
 
+      const extraArgs = this.extraArgs?.[index] ?? [];
+
       const process = CmdService._processManager.startManagedProcess(
         command[0],
-        command.slice(1),
+        command.slice(1).concat(extraArgs),
         { cwd: directory[index] },
         (useProcessIndex ?
           `${this.prefix}${index}:` :
