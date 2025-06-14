@@ -75,20 +75,29 @@ class CmdService extends BaseService {
           }
 
           const backslashes = match[1];
+
+          const startIndex = match.index + backslashes.length;
+
           if (backslashes.length % 2 === 1) {
+            indexesToReplace.unshift({
+              startIndex: startIndex - 1,
+              endIndex: startIndex + 5,
+              replacement: '$arg',
+            });
             continue;
           }
 
           const replacement = extraArgs.shift() ?? '';
           indexesToReplace.unshift({
-            index: match.index + backslashes.length,
+            startIndex,
+            endIndex: startIndex + 4,
             replacement,
           });
         }
 
-        indexesToReplace.forEach(({ index, replacement }) => {
-          console.log(arg.slice(0, index));
-          arg = arg.slice(0, index) + replacement + arg.slice(index + 4);
+        indexesToReplace.forEach(({ startIndex, endIndex, replacement }) => {
+          console.log({ replacement, start: arg.slice(0, startIndex) });
+          arg = arg.slice(0, startIndex) + replacement + arg.slice(endIndex);
         });
 
         return arg;
