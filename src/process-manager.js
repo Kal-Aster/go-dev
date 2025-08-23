@@ -1,6 +1,5 @@
 const { spawn, spawnSync } = require('child_process');
-const { appendFileSync } = require('fs');
-
+const prefixLines = require("./prefix-lines");
 
 class ProcessManager {
   constructor() {
@@ -120,27 +119,16 @@ class ProcessManager {
     });
     processReference.process = startedProcess;
 
+    let latestColor = '';
     startedProcess.stdout.on('data', (data) => {
-      let prefixedData = data.toString().split('\n').map(line => `${prefix} ${line}`).join('\n');
-      if (prefixedData.endsWith(`${prefix} `)) {
-          prefixedData = prefixedData.slice(0, -(`${prefix} `).length);
-      }
-      if (!prefixedData.endsWith('\n')) {
-          prefixedData = prefixedData + '\n';
-      }
-      prefixedData = prefixedData.replace(/\x1b\[(?:2J|3J|H)/gi, '');
-      process.stdout.write(prefixedData);
+      const result = prefixLines(data.toString(), prefix, latestColor);
+      latestColor = result.latestColor;
+      process.stdout.write(result.prefixedText);
     });
     startedProcess.stderr.on('data', (data) => {
-      let prefixedData = data.toString().split('\n').map(line => `${prefix} ${line}`).join('\n');
-      if (prefixedData.endsWith(`${prefix} `)) {
-          prefixedData = prefixedData.slice(0, -(`${prefix} `).length);
-      }
-      if (!prefixedData.endsWith('\n')) {
-          prefixedData = prefixedData + '\n';
-      }
-      prefixedData = prefixedData.replace(/\x1b\[(?:2J|H)/gi, '');
-      process.stderr.write(prefixedData);
+      const result = prefixLines(data.toString(), prefix, latestColor);
+      latestColor = result.latestColor;
+      process.stderr.write(result.prefixedText);
     });
 
     this.managedProcesses.add(startedProcess);
