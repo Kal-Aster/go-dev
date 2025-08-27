@@ -1,7 +1,6 @@
 const Joi = require('joi');
 const yaml = require('js-yaml');
 const fs = require('fs');
-const path = require('path');
 
 const dependencyEntrySchema = Joi.alternatives().try(
   Joi.string(),

@@ -119,15 +119,17 @@ class ProcessManager {
     });
     processReference.process = startedProcess;
 
-    let latestColor = '';
+    let lastFormatting = '';
     startedProcess.stdout.on('data', (data) => {
-      const result = prefixLines(data.toString(), prefix, latestColor);
-      latestColor = result.latestColor;
+      const result = prefixLines(data.toString(), prefix, lastFormatting);
+      lastFormatting = result.lastFormatting;
+      // process.stdout.write(JSON.stringify(data.toString()) + "\n");
       process.stdout.write(result.prefixedText);
     });
     startedProcess.stderr.on('data', (data) => {
-      const result = prefixLines(data.toString(), prefix, latestColor);
-      latestColor = result.latestColor;
+      const result = prefixLines(data.toString(), prefix, lastFormatting);
+      lastFormatting = result.lastFormatting;
+      // process.stderr.write(JSON.stringify(data.toString()) + "\n");
       process.stderr.write(result.prefixedText);
     });
 

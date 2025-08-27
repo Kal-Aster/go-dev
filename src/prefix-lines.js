@@ -1,9 +1,9 @@
-const detectLatestColor = require("./detect-last-color");
+const detectLastFormatting = require("./terminal-formatting/detect-last-formatting");
 
-function prefixLines(text, prefix, latestColor) {
+function prefixLines(text, prefix, latestFormatting) {
   let prefixedText = text.split('\n').map(line => {
-    latestColor = detectLatestColor(line, latestColor);
-    return `${prefix} ${latestColor}${line}${latestColor !== '' ? '\x1b[0m' : ''}`;
+    latestFormatting = detectLastFormatting(line, latestFormatting);
+    return `${prefix} ${latestFormatting}${line}${latestFormatting !== '' ? '\x1b[0m' : ''}`;
   }).join('\n');
 
   if (prefixedText.endsWith(`${prefix} `)) {
@@ -14,7 +14,7 @@ function prefixLines(text, prefix, latestColor) {
   }
   prefixedText = prefixedText.replace(/\x1b\[(?:2J|3J|H)|\x1bc|\x1b\[2K|\x1b\[K/gi, '');
 
-  return { prefixedText, latestColor };
+  return { prefixedText, lastFormatting: latestFormatting };
 }
 
 module.exports = prefixLines;
