@@ -1,5 +1,7 @@
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, execSync } = require('child_process');
 const prefixLines = require("./prefix-lines");
+
+const isWindows = process.platform === 'win32';
 
 class ProcessManager {
   constructor() {
@@ -123,13 +125,11 @@ class ProcessManager {
     startedProcess.stdout.on('data', (data) => {
       const result = prefixLines(data.toString(), prefix, lastFormatting);
       lastFormatting = result.lastFormatting;
-      // process.stdout.write(JSON.stringify(data.toString()) + "\n");
       process.stdout.write(result.prefixedText);
     });
     startedProcess.stderr.on('data', (data) => {
       const result = prefixLines(data.toString(), prefix, lastFormatting);
       lastFormatting = result.lastFormatting;
-      // process.stderr.write(JSON.stringify(data.toString()) + "\n");
       process.stderr.write(result.prefixedText);
     });
 
@@ -178,47 +178,65 @@ class ProcessManager {
     return processReference;
   }
 
-  killProcess(process) {
-    if (process.killed || process.exitCode != null) {
-      return;
+  /**
+   * Kills a single child process.
+   * On Windows, uses taskkill to kill the entire process tree.
+   * @param {ChildProcess} childProcess - The process to kill.
+   * @returns {Promise<void>}
+   */
+  killProcess(childProcess) {
+    if (childProcess.killed || childProcess.exitCode != null) {
+      return Promise.resolve();
     }
 
-    this.managedProcesses.delete(process);
+    this.managedProcesses.delete(childProcess);
 
-    return new Promise((resolve, reject) => {
+    if (isWindows) {
+      try {
+        execSync(`taskkill /T /F /PID ${childProcess.pid}`, { stdio: 'ignore' });
+      } catch {
+        // Process may have already been terminated by Ctrl+C signal propagation - this is OK
+      }
+      return Promise.resolve();
+    }
+
+    // On Unix, use SIGTERM with timeout fallback to SIGKILL
+    return new Promise((resolve) => {
       let exited = false;
+      let timeoutId = null;
+      
       const onExit = () => {
         exited = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         resolve();
       };
-      process.on('exit', onExit);
+      childProcess.on('exit', onExit);
 
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         if (exited) {
           return;
         }
 
-        console.error(`[ProcessManager] Timeout reached for process interruption ${process.pid}`);
+        console.error(`[ProcessManager] Timeout reached for process interruption ${childProcess.pid}`);
         try {
-          process.kill('SIGKILL');
+          childProcess.kill('SIGKILL');
         } catch (e) {
-          console.error(`[ProcessManager] Error force killing process ${process.pid}: ${e.message}`);
-          reject(e);
+          console.error(`[ProcessManager] Error force killing process ${childProcess.pid}: ${e.message}`);
         }
+        resolve();
       }, 500);
 
       try {
-        process.kill('SIGTERM');
-        return;
+        childProcess.kill('SIGTERM');
       } catch (e) {
-        console.error(`[ProcessManager] Error signaling process ${process.pid}: ${e.message}`);
-      }
-
-      try {
-        process.kill('SIGKILL');
-      } catch (e) {
-        console.error(`[ProcessManager] Error force killing process ${process.pid}: ${e.message}`);
-        reject(e);
+        console.error(`[ProcessManager] Error signaling process ${childProcess.pid}: ${e.message}`);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        resolve();
       }
     });
   }
@@ -248,23 +266,37 @@ class ProcessManager {
     for (const proc of processesToKill) {
       console.log(`[ProcessManager] Killing managed process PID: ${proc.pid}`);
       try {
-        proc.kill('SIGTERM');
+        if (isWindows) {
+          // On Windows, use taskkill to kill the entire process tree
+          try {
+            execSync(`taskkill /T /F /PID ${proc.pid}`, { stdio: 'ignore' });
+          } catch {
+            // Process may have already been terminated - this is OK
+          }
+        } else {
+          proc.kill('SIGTERM');
+        }
       } catch (e) {
         console.error(`[ProcessManager] Error killing process ${proc.pid}: ${e.message}`);
       }
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // On Unix, wait for processes to exit gracefully before using SIGKILL
+    if (processesToKill.length > 0 && !isWindows) {
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-    for (const proc of [...this.managedProcesses]) {
-      if (proc.killed || proc.exitCode != null) {
-        continue;
-      }
+      for (const proc of [...this.managedProcesses]) {
+        if (proc.killed || proc.exitCode != null) {
+          this.managedProcesses.delete(proc);
+          continue;
+        }
 
-      console.warn(`[ProcessManager] Process ${proc.pid} did not exit gracefully, forcing kill.`);
-      try {
-        proc.kill('SIGKILL');
-      } catch (e) {
-        console.error(`[ProcessManager] Error forcing kill for process ${proc.pid}: ${e.message}`);
+        console.warn(`[ProcessManager] Process ${proc.pid} did not exit gracefully, forcing kill.`);
+        try {
+          proc.kill('SIGKILL');
+        } catch (e) {
+          console.error(`[ProcessManager] Error forcing kill for process ${proc.pid}: ${e.message}`);
+        }
       }
     }
 
