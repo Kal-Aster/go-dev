@@ -231,22 +231,21 @@ class ProcessManager {
       console.log('[ProcessManager] Cleanup of managed processes already in progress, skipping.');
       return;
     }
-    for (let index = this.managedProcesses.length - 1; index >= 0; index--) {
-      const process = this.managedProcesses[index];
-      if (process.killed || process.exitCode != null) {
-        this.managedProcesses.splice(index, 1);
-      }
-    }
 
     this.cleanupInProgress = true;
 
     console.log('\n[ProcessManager] Initiating cleanup of managed processes...');
 
-    for (const proc of [...this.managedProcesses]) {
+    // Filter out already-dead processes
+    const processesToKill = [...this.managedProcesses].filter(proc => {
       if (proc.killed || proc.exitCode != null) {
-        continue;
+        this.managedProcesses.delete(proc);
+        return false;
       }
-
+      return true;
+    });
+    
+    for (const proc of processesToKill) {
       console.log(`[ProcessManager] Killing managed process PID: ${proc.pid}`);
       try {
         proc.kill('SIGTERM');
