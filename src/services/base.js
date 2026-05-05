@@ -1,3 +1,5 @@
+const { buildColoredTag } = require('../service-colors');
+
 class BaseService {
   /** @type {import("../process-manager")} */
   static _processManager = null;
@@ -39,6 +41,10 @@ class BaseService {
     this.config = config;
     this.onExit = onExit;
     this.extraArgs = extraArgs;
+  }
+
+  get coloredId() {
+    return buildColoredTag(this.name, this.mode);
   }
 
   async start() {

@@ -40,15 +40,15 @@ class DockerService extends BaseService {
   }
 
   async start() {
-    console.log(`[${this.name}:${this.mode}] Starting docker service '${this.dockerServiceName}' (using ${this.dockerComposeFile})...`);
+    console.log(`[${this.coloredId}] Starting docker service '${this.dockerServiceName}' (using ${this.dockerComposeFile})...`);
 
     let status = this._getContainerStatus();
     if (status === 'running') {
       console.log(
-        `[${this.name}:${this.mode}] Docker container for '${this.dockerServiceName}' is already running.`,
+        `[${this.coloredId}] Docker container for '${this.dockerServiceName}' is already running.`,
       );
     } else {
-      console.log(`[${this.name}:${this.mode}] Bringing up docker service '${this.dockerServiceName}'...`);
+      console.log(`[${this.coloredId}] Bringing up docker service '${this.dockerServiceName}'...`);
       try {
         const servicesBeforeStart = this._getCurrentlyRunningServices();
         await DockerService._processManager.runInherited(
@@ -70,34 +70,34 @@ class DockerService extends BaseService {
           this.dockerComposeFile,
           servicesOfComposeFile.concat(newServices)
         );
-        console.log(`[${this.name}:${this.mode}] Docker service '${this.dockerServiceName}' brought up.`);
+        console.log(`[${this.coloredId}] Docker service '${this.dockerServiceName}' brought up.`);
         if (newServices.length > 1) {
-          console.log(`[${this.name}:${this.mode}] Dependency service${newServices.length > 2 ? 's' : ''} for '${this.dockerServiceName}': ${newServices.filter(service => service.name !== this.dockerServiceName).join(', ')}`);
+          console.log(`[${this.coloredId}] Dependency service${newServices.length > 2 ? 's' : ''} for '${this.dockerServiceName}': ${newServices.filter(service => service.name !== this.dockerServiceName).join(', ')}`);
         }
       } catch (error) {
         throw new Error(
-          `[${this.name}:${this.mode}] Failed to bring up docker service '${this.dockerServiceName}': ${error.message}`,
+          `[${this.coloredId}] Failed to bring up docker service '${this.dockerServiceName}': ${error.message}`,
         );
       }
     }
 
     if (this.config.healthCheck) {
-      console.log(`[${this.name}:${this.mode}] Checking healthiness for '${this.dockerServiceName}'...`);
+      console.log(`[${this.coloredId}] Checking healthiness for '${this.dockerServiceName}'...`);
       try {
         await this._checkServiceHealthiness();
-        console.log(`[${this.name}:${this.mode}] Docker service '${this.dockerServiceName}' is healthy.`);
+        console.log(`[${this.coloredId}] Docker service '${this.dockerServiceName}' is healthy.`);
       } catch (error) {
         throw new Error(
-          `[${this.name}:${this.mode}] Health check failed for '${this.dockerServiceName}': ${error.message}`,
+          `[${this.coloredId}] Health check failed for '${this.dockerServiceName}': ${error.message}`,
         );
       }
     } else {
-      console.log(`[${this.name}:${this.mode}] Skipping health check for '${this.dockerServiceName}'.`);
+      console.log(`[${this.coloredId}] Skipping health check for '${this.dockerServiceName}'.`);
     }
   }
 
   async stop() {
-    console.log(`[${this.name}:${this.mode}] Relying on orchestrator's static docker compose stop for '${this.dockerServiceName}'.`);
+    console.log(`[${this.coloredId}] Relying on orchestrator's static docker compose stop for '${this.dockerServiceName}'.`);
     this.containerName = null;
   }
 
@@ -160,10 +160,10 @@ class DockerService extends BaseService {
   async _checkServiceHealthiness(maxAttempts = 30, delayMs = 1000) {
     const containerName = this._getContainerName();
     if (!containerName) {
-      throw new Error(`[${this.name}:${this.mode}] Cannot check health: Container for '${this.dockerServiceName}' not found.`);
+      throw new Error(`[${this.coloredId}] Cannot check health: Container for '${this.dockerServiceName}' not found.`);
     }
 
-    console.log(`[${this.name}:${this.mode}] Checking healthiness for '${containerName}'`);
+    console.log(`[${this.coloredId}] Checking healthiness for '${containerName}'`);
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (attempt > 1) {
         await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -177,7 +177,7 @@ class DockerService extends BaseService {
         );
 
         if (healthStatus === 'healthy' || healthStatus === 'none') {
-          console.log(`[${this.name}:${this.mode}] Container '${containerName}' healthy!`);
+          console.log(`[${this.coloredId}] Container '${containerName}' healthy!`);
           return true;
         }
 
@@ -185,13 +185,13 @@ class DockerService extends BaseService {
           continue;
         }
 
-        throw new Error(`[${this.name}:${this.mode}] Container '${containerName}' is in unexpected health state: ${healthStatus}`);
+        throw new Error(`[${this.coloredId}] Container '${containerName}' is in unexpected health state: ${healthStatus}`);
       } catch (error) {
-        throw new Error(`[${this.name}:${this.mode}] Failed to check health for '${containerName}': ${error.message}`);
+        throw new Error(`[${this.coloredId}] Failed to check health for '${containerName}': ${error.message}`);
       }
     }
 
-    throw new Error(`[${this.name}:${this.mode}] Service '${this.dockerServiceName}' wasn't healthy in time after ${maxAttempts} attempts.`);
+    throw new Error(`[${this.coloredId}] Service '${this.dockerServiceName}' wasn't healthy in time after ${maxAttempts} attempts.`);
   }
 }
 

@@ -1,4 +1,5 @@
 const { BaseService } = require('./base');
+const { buildColoredPrefix, buildColoredTag } = require('../service-colors');
 
 class CmdService extends BaseService {
   /**
@@ -9,7 +10,6 @@ class CmdService extends BaseService {
 
   constructor(name, mode, config, onExit, extraArgs) {
     super(name, mode, config, onExit, extraArgs);
-    this.prefix = `${name}:${mode}:`;
     this.processes = [];
   }
 
@@ -59,7 +59,7 @@ class CmdService extends BaseService {
     }
 
     const promise = (async () => {
-      const ctx = `${serviceName}:${mode}`;
+      const ctx = buildColoredTag(serviceName, mode);
       console.log(`[${ctx}] Running as preCommand service...`);
 
       if (config.preCommands && config.preCommands.length > 0) {
@@ -110,21 +110,21 @@ class CmdService extends BaseService {
   }
 
   async start() {
-    console.log(`[${this.name}:${this.mode}] Starting cmd service...`);
+    console.log(`[${this.coloredId}] Starting cmd service...`);
 
     const { preCommands, commands } = this.config;
     if (!commands) {
       throw new Error(
-        `[${this.name}:${this.mode}] Commands not found for service.`,
+        `[${this.coloredId}] Commands not found for service.`,
       );
     }
 
     if (preCommands && preCommands.length > 0) {
-      console.log(`[${this.name}:${this.mode}] Running pre-commands...`);
+      console.log(`[${this.coloredId}] Running pre-commands...`);
       for (const pre of preCommands) {
-        await CmdService._runPreCommand(pre, `${this.name}:${this.mode}`);
+        await CmdService._runPreCommand(pre, this.coloredId);
       }
-      console.log(`[${this.name}:${this.mode}] Pre-commands completed.`);
+      console.log(`[${this.coloredId}] Pre-commands completed.`);
     }
 
     const { cmdArgs, directory, restartOnError } = (Array.isArray(commands) && typeof commands[0] === 'string' ?
@@ -189,14 +189,16 @@ class CmdService extends BaseService {
         return arg;
       }).concat(extraArgs);
 
+      const prefix = buildColoredPrefix(
+        this.name,
+        this.mode,
+        useProcessIndex ? index : null,
+      );
       const process = CmdService._processManager.startManagedProcess(
         command,
         finalArgs,
         { cwd: directory[index] },
-        (useProcessIndex ?
-          `${this.prefix}${index}:` :
-          this.prefix
-        ),
+        prefix,
         restartOnError[index],
         () => {
           exitedProcess[index] = true;
@@ -210,20 +212,20 @@ class CmdService extends BaseService {
   
       if (!process) {
         throw new Error(
-          `[${this.name}:${this.mode}] Failed to spawn process: ${command.join(' ')}`,
+          `[${this.coloredId}] Failed to spawn process: ${command.join(' ')}`,
         );
       }
 
       this.processes.push(process);
       console.log(
-        `[${this.name}:${this.mode}] Process started (PID: ${process.process.pid}).`,
+        `[${this.coloredId}] Process started (PID: ${process.process.pid}).`,
       );
     }
   }
 
   async stop() {
     const promises = this.processes.map(({ process }) => {
-      console.log(`[${this.name}:${this.mode}] Stopping process (PID: ${process.pid}).`);
+      console.log(`[${this.coloredId}] Stopping process (PID: ${process.pid}).`);
       return CmdService._processManager.killProcess(process);
     });
     this.processes.splice(0, this.processes.length);

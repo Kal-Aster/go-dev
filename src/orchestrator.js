@@ -1,6 +1,7 @@
 const { loadConfig } = require('./config');
 const { resolveServiceExecutionGraph } = require('./dependency-resolver');
 const ProcessManager = require('./process-manager');
+const { buildColoredTag, colorService, colorMode } = require('./service-colors');
 const { BaseService } = require('./services/base');
 const { CmdService } = require('./services/cmd');
 const { DockerService } = require('./services/docker');
@@ -29,9 +30,9 @@ class Orchestrator {
 
       console.log(`Starting development environment for preset: ${presetName}`);
       console.log('--- Resolved Dependencies to Start First ---');
-      dependencies.forEach(s => console.log(` - ${s.name} (mode: ${s.mode})`));
+      dependencies.forEach(s => console.log(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
       console.log('--- Resolved Primary Services to Run ---');
-      primaryServices.forEach(s => console.log(` - ${s.name} (mode: ${s.mode})`));
+      primaryServices.forEach(s => console.log(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
 
       const extraArgs = new Map();
       {
@@ -93,7 +94,7 @@ class Orchestrator {
       console.log('\n--- Starting Dependencies ---');
       for (const { name, mode, config } of dependencies) {
         if (this.activeServiceInstances.has(name)) {
-          console.log(`[${name}:${mode}] Already active, skipping start.`);
+          console.log(`[${buildColoredTag(name, mode)}] Already active, skipping start.`);
           continue;
         }
         const ServiceClass = serviceTypeMap[config.type];
@@ -110,7 +111,7 @@ class Orchestrator {
       const primaryServicePromises = [];
       for (const { name, mode, config } of primaryServices) {
         if (this.activeServiceInstances.has(name)) {
-          console.log(`[${name}:${mode}] Already active, skipping start.`);
+          console.log(`[${buildColoredTag(name, mode)}] Already active, skipping start.`);
           continue;
         }
         const ServiceClass = serviceTypeMap[config.type];
@@ -154,10 +155,10 @@ class Orchestrator {
 
     for (const [name, instance] of this.activeServiceInstances.entries()) {
       try {
-        console.log(`[Orchestrator] Requesting instance stop for ${name}:${instance.mode}`);
+        console.log(`[Orchestrator] Requesting instance stop for ${buildColoredTag(name, instance.mode)}`);
         await instance.stop();
       } catch (error) {
-        console.error(`[Orchestrator] Error stopping instance ${name}:${instance.mode}: ${error.message}`);
+        console.error(`[Orchestrator] Error stopping instance ${buildColoredTag(name, instance.mode)}: ${error.message}`);
       }
     }
 
