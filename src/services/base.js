@@ -1,3 +1,4 @@
+const log = require('../logger');
 const { buildColoredTag } = require('../service-colors');
 
 class BaseService {
@@ -15,7 +16,7 @@ class BaseService {
    */
   static initialize(processManagerInstance, servicesMap) {
     if (BaseService._processManager) {
-      console.warn('BaseService.initialize called multiple times. Skipping.');
+      log.warn('BaseService.initialize called multiple times. Skipping.');
       return;
     }
     BaseService._processManager = processManagerInstance;
@@ -27,7 +28,7 @@ class BaseService {
    * @returns {Promise<void>}
    */
   static async cleanup() {
-    console.log(`[${this.name}] No specific static cleanup defined.`);
+    log.debug(`[${this.name}] No specific static cleanup defined.`);
   }
 
   /**

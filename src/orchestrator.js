@@ -1,5 +1,6 @@
 const { loadConfig } = require('./config');
 const { resolveServiceExecutionGraph } = require('./dependency-resolver');
+const log = require('./logger');
 const ProcessManager = require('./process-manager');
 const { buildColoredTag, colorService, colorMode } = require('./service-colors');
 const { BaseService } = require('./services/base');
@@ -11,9 +12,16 @@ const serviceTypeMap = {
   docker: DockerService,
 };
 
+const bold = (text) => `\x1b[1m${text}\x1b[0m`;
+
 class Orchestrator {
-  constructor(configPath) {
+  constructor(configPath, options = {}) {
     this.config = loadConfig(configPath);
+
+    const level = options.logLevel ?? this.config.logLevel;
+    if (level) {
+      log.setLogLevel(level);
+    }
 
     this.processManager = new ProcessManager();
     this.activeServiceInstances = new Map();
@@ -28,17 +36,17 @@ class Orchestrator {
         presetName,
       );
 
-      console.log(`Starting development environment for preset: ${presetName}`);
-      console.log('--- Resolved Dependencies to Start First ---');
-      dependencies.forEach(s => console.log(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
-      console.log('--- Resolved Primary Services to Run ---');
-      primaryServices.forEach(s => console.log(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
+      log.info(bold(`Preset: ${presetName}`));
+      log.info(`\n${bold('Resolved dependencies')}`);
+      dependencies.forEach(s => log.info(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
+      log.info(`\n${bold('Resolved primary services')}`);
+      primaryServices.forEach(s => log.info(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
 
       const extraArgs = new Map();
       {
         const argsToParse = process.argv.slice(3);
         if (argsToParse.length > 0) {
-          console.log(`--- Gathering args to pass to services ---`);
+          log.info(`\n${bold('Gathering arguments')}`);
           const serviceArgsKeyword = `--${this.config.serviceArgsKeyword ?? 'args-for'}`;
           let isGettingService = false;
           let currentService = null;
@@ -85,16 +93,16 @@ class Orchestrator {
 
           for (const [service, indexedArgs] of extraArgs.entries()) {
             indexedArgs.forEach((args, index) => {
-              console.log(`Extra args for service '${service}:${index}': [${args.join(', ')}]`);
+              log.info(` - ${service}:${index}: [${args.join(', ')}]`);
             });
           }
         }
       }
 
-      console.log('\n--- Starting Dependencies ---');
+      log.info(`\n${bold('Starting dependencies')}`);
       for (const { name, mode, config } of dependencies) {
         if (this.activeServiceInstances.has(name)) {
-          console.log(`[${buildColoredTag(name, mode)}] Already active, skipping start.`);
+          log.info(`[${buildColoredTag(name, mode)}] Already active, skipping start.`);
           continue;
         }
         const ServiceClass = serviceTypeMap[config.type];
@@ -106,12 +114,12 @@ class Orchestrator {
         await serviceInstance.start();
       }
 
-      console.log('\n--- Starting Primary Services ---');
+      log.info(`\n${bold('Starting primary services')}`);
       const activePrimaryServices = new Map();
       const primaryServicePromises = [];
       for (const { name, mode, config } of primaryServices) {
         if (this.activeServiceInstances.has(name)) {
-          console.log(`[${buildColoredTag(name, mode)}] Already active, skipping start.`);
+          log.info(`[${buildColoredTag(name, mode)}] Already active, skipping start.`);
           continue;
         }
         const ServiceClass = serviceTypeMap[config.type];
@@ -132,14 +140,14 @@ class Orchestrator {
       }
       await Promise.all(primaryServicePromises);
 
-      console.log('\n--- All services initiated. Press Ctrl+C to stop. ---');
+      log.info(`\n${bold('Ready')} (press Ctrl+C to stop)`);
 
       process.once('SIGINT', this.cleanup.bind(this));
       process.once('SIGTERM', this.cleanup.bind(this));
       process.stdin.resume();
 
     } catch (error) {
-      console.error('\n❌ Orchestrator failed to start:', error.message);
+      log.error('\n❌ Orchestrator failed to start:', error.message);
       await this.cleanup(true);
       process.exit(1);
     }
@@ -147,25 +155,25 @@ class Orchestrator {
 
   async cleanup() {
     if (this.processManager.cleanupInProgress) {
-      console.log('[Orchestrator] Cleanup already in progress.');
+      log.debug('[Orchestrator] Cleanup already in progress.');
       return;
     }
 
-    console.log('\n[Orchestrator] Initiating graceful cleanup...');
+    log.info(`\n${bold('Shutting down')}`);
 
     for (const [name, instance] of this.activeServiceInstances.entries()) {
       try {
-        console.log(`[Orchestrator] Requesting instance stop for ${buildColoredTag(name, instance.mode)}`);
+        log.info(` - ${buildColoredTag(name, instance.mode)}`);
         await instance.stop();
       } catch (error) {
-        console.error(`[Orchestrator] Error stopping instance ${buildColoredTag(name, instance.mode)}: ${error.message}`);
+        log.error(` - ${buildColoredTag(name, instance.mode)}: ${error.message}`);
       }
     }
 
     await DockerService.cleanup();
     await this.processManager.cleanupManagedProcesses();
 
-    console.log('[Orchestrator] Cleanup complete.');
+    log.info(`\n${bold('Done')}`);
     process.exit(0);
   }
 }

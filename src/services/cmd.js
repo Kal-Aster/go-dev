@@ -1,3 +1,4 @@
+const log = require('../logger');
 const { BaseService } = require('./base');
 const { buildColoredPrefix, buildColoredTag } = require('../service-colors');
 
@@ -54,13 +55,13 @@ class CmdService extends BaseService {
     const key = `${serviceName}:${mode}`;
     const existing = CmdService._serviceCommandCache.get(key);
     if (existing) {
-      console.log(`[${fromContext}] preCommand service '${key}' already in flight or completed; awaiting.`);
+      log.info(`[${fromContext}] preCommand service '${key}' already in flight or completed; awaiting.`);
       return existing;
     }
 
     const promise = (async () => {
       const ctx = buildColoredTag(serviceName, mode);
-      console.log(`[${ctx}] Running as preCommand service...`);
+      log.info(`[${ctx}] Running as preCommand service...`);
 
       if (config.preCommands && config.preCommands.length > 0) {
         for (const pre of config.preCommands) {
@@ -74,7 +75,7 @@ class CmdService extends BaseService {
         return CmdService._processManager.runInherited(cmd, args, { cwd: directory });
       }));
 
-      console.log(`[${ctx}] preCommand service completed.`);
+      log.info(`[${ctx}] preCommand service completed.`);
     })();
 
     CmdService._serviceCommandCache.set(key, promise);
@@ -102,7 +103,7 @@ class CmdService extends BaseService {
         stdio: 'inherit',
       });
     } catch (error) {
-      console.log({ cmdArgs });
+      log.debug({ cmdArgs });
       throw new Error(
         `[${fromContext}] Pre-command failed: ${cmdArgs.join(' ')}: ${error.message}`,
       );
@@ -110,7 +111,7 @@ class CmdService extends BaseService {
   }
 
   async start() {
-    console.log(`[${this.coloredId}] Starting cmd service...`);
+    log.info(`[${this.coloredId}] Starting cmd service...`);
 
     const { preCommands, commands } = this.config;
     if (!commands) {
@@ -120,11 +121,11 @@ class CmdService extends BaseService {
     }
 
     if (preCommands && preCommands.length > 0) {
-      console.log(`[${this.coloredId}] Running pre-commands...`);
+      log.info(`[${this.coloredId}] Running pre-commands...`);
       for (const pre of preCommands) {
         await CmdService._runPreCommand(pre, this.coloredId);
       }
-      console.log(`[${this.coloredId}] Pre-commands completed.`);
+      log.info(`[${this.coloredId}] Pre-commands completed.`);
     }
 
     const { cmdArgs, directory, restartOnError } = (Array.isArray(commands) && typeof commands[0] === 'string' ?
@@ -182,7 +183,7 @@ class CmdService extends BaseService {
         }
 
         indexesToReplace.forEach(({ startIndex, endIndex, replacement }) => {
-          console.log({ replacement, start: arg.slice(0, startIndex) });
+          log.debug({ replacement, start: arg.slice(0, startIndex) });
           arg = arg.slice(0, startIndex) + replacement + arg.slice(endIndex);
         });
 
@@ -217,7 +218,7 @@ class CmdService extends BaseService {
       }
 
       this.processes.push(process);
-      console.log(
+      log.debug(
         `[${this.coloredId}] Process started (PID: ${process.process.pid}).`,
       );
     }
@@ -225,7 +226,7 @@ class CmdService extends BaseService {
 
   async stop() {
     const promises = this.processes.map(({ process }) => {
-      console.log(`[${this.coloredId}] Stopping process (PID: ${process.pid}).`);
+      log.debug(`[${this.coloredId}] Stopping process (PID: ${process.pid}).`);
       return CmdService._processManager.killProcess(process);
     });
     this.processes.splice(0, this.processes.length);

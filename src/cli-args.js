@@ -2,19 +2,21 @@
  * Parses go-dev CLI arguments.
  *
  * Recognizes:
- *   <preset>                 — positional preset name (first non-flag arg)
- *   -c <path>, --config <path>, -c=<path>, --config=<path>
+ *   <preset>                                   — positional preset name (first non-flag arg)
+ *   -c <path>,  --config <path>,  -c=<path>,    --config=<path>
+ *   -l <level>, --log-level <level>, -l=<lvl>,  --log-level=<lvl>
  *
- * `-c`/`--config` is only interpreted before the first `--args-for` token.
- * Everything from `--args-for` onward is preserved verbatim in `remaining`
- * so the orchestrator's per-service args parser can consume it untouched.
+ * Flags are only interpreted before the first `--args-for` token. Everything
+ * from `--args-for` onward is preserved verbatim in `remaining` so the
+ * orchestrator's per-service args parser can consume it untouched.
  *
  * @param {string[]} argv - argv tail (already stripped of node + script path).
- * @returns {{ presetName?: string, configPath?: string, remaining: string[] }}
+ * @returns {{ presetName?: string, configPath?: string, logLevel?: string, remaining: string[] }}
  */
 function parseCliArgs(argv) {
   let presetName;
   let configPath;
+  let logLevel;
   const remaining = [];
 
   let i = 0;
@@ -44,6 +46,25 @@ function parseCliArgs(argv) {
       continue;
     }
 
+    if (arg === '-l' || arg === '--log-level') {
+      const value = argv[i + 1];
+      if (value == null) {
+        throw new Error(`'${arg}' flag requires a level argument (error|warn|info|debug).`);
+      }
+      logLevel = value;
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--log-level=')) {
+      logLevel = arg.slice('--log-level='.length);
+      continue;
+    }
+    if (arg.startsWith('-l=')) {
+      logLevel = arg.slice('-l='.length);
+      continue;
+    }
+
     if (presetName == null && !arg.startsWith('-')) {
       presetName = arg;
       continue;
@@ -56,7 +77,7 @@ function parseCliArgs(argv) {
     remaining.push(argv[i]);
   }
 
-  return { presetName, configPath, remaining };
+  return { presetName, configPath, logLevel, remaining };
 }
 
 module.exports = { parseCliArgs };
