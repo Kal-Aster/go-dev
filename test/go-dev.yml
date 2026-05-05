@@ -1,0 +1,84 @@
+# Test configuration with dummy services to exercise go-dev features,
+# especially the service-as-preCommand support.
+#
+# Run from the repo root with one of:
+#   node bin/go-dev api    -c test/go-dev.yml   # the user's actual scenario
+#   node bin/go-dev dedup  -c test/go-dev.yml   # main:build referenced twice -> runs once
+#   node bin/go-dev multi  -c test/go-dev.yml   # preCommand-service with parallel commands
+#   node bin/go-dev basic  -c test/go-dev.yml   # regression: literal preCommand only
+
+services:
+
+  # `main` package: has a long-running dev watcher and one-shot build modes.
+  main:
+    type: hybrid
+    modes:
+      dev:
+        type: cmd
+        commands: [bash, -c, "i=0; while sleep 1; do i=$((i+1)); echo 'main:dev tick' $i; done"]
+
+      build:
+        type: cmd
+        # Inner literal preCommand to verify recursion works when this mode
+        # is itself invoked as a service-preCommand from api/worker.
+        preCommands:
+          - [bash, -c, "echo '   [main:build] inner literal pre-step'"]
+        commands: [bash, -c, "echo '   [main:build] STARTED'; sleep 1; echo '   [main:build] DONE'"]
+
+      build-multi:
+        # Two parallel one-shot commands; both must complete before the
+        # caller's main command starts.
+        type: cmd
+        commands:
+          - command: [bash, -c, "echo '   [main:build-multi:0] STARTED'; sleep 1; echo '   [main:build-multi:0] DONE'"]
+          - command: [bash, -c, "echo '   [main:build-multi:1] STARTED'; sleep 2; echo '   [main:build-multi:1] DONE'"]
+
+  # `api` is the user's real scenario: build main once, then run api:dev with main:dev as a peer.
+  api:
+    type: cmd
+    preCommands:
+      - { service: main, mode: build }
+    commands: [bash, -c, "i=0; while sleep 1; do i=$((i+1)); echo 'api:dev tick' $i; done"]
+    dependencies:
+      - { service: main, mode: dev }
+
+  # Second referrer of main:build, to test the dedup cache.
+  worker:
+    type: cmd
+    preCommands:
+      - { service: main, mode: build }
+    commands: [bash, -c, "i=0; while sleep 1; do i=$((i+1)); echo 'worker:dev tick' $i; done"]
+
+  # Exercises a preCommand-service that itself has multiple parallel commands.
+  multi:
+    type: cmd
+    preCommands:
+      - { service: main, mode: build-multi }
+    commands: [bash, -c, "echo 'multi:dev started after build-multi'; sleep 2; echo 'multi:dev done'"]
+
+
+presets:
+
+  # Scenario A: api:dev with main:build precommand + main:dev dependency.
+  # Expected: main:build runs once to completion, then api:dev and main:dev run concurrently.
+  api:
+    services: [api]
+
+  # Scenario B: dedup. Two primary services both reference main:build.
+  # Expected: "[main:build] STARTED ... DONE" appears EXACTLY ONCE.
+  dedup:
+    services: [api, worker]
+
+  # Scenario C: parallel commands inside a preCommand-service.
+  # Expected: both build-multi:0 and build-multi:1 STARTED before either DONE,
+  # then multi:dev starts after both complete.
+  multi:
+    services: [multi]
+
+  # Scenario D: regression check that a literal-array preCommand still runs.
+  # Runs main in 'build' mode as the primary; main:build's literal preCommand fires first.
+  # Expected: "inner literal pre-step" -> "STARTED" -> "DONE" -> auto-exit.
+  basic:
+    services: [main]
+    modes:
+      main: build

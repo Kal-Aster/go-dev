@@ -48,11 +48,11 @@ yarn add --dev go-dev
 Once installed, simply run `go-dev` with the name of the preset you want to start:
 
 ```bash
-npx go-dev <preset_name> [config_path]
+npx go-dev <preset_name> [-c|--config <path>]
 ```
 
 *   `<preset_name>`: The name of the preset defined in your `go-dev.yml` (e.g., `api`, `frontend`, `all`).
-*   `[config_path]`: (Optional) Path to your `go-dev.yml` file. Defaults to looking for `go-dev.yml`, `.go-dev.yml`, `go-dev.yaml`, or `.go-dev.yaml` in the current directory.
+*   `-c <path>` / `--config <path>` (also `-c=<path>` / `--config=<path>`): (Optional) Path to your `go-dev.yml` file. When omitted, `go-dev` auto-discovers a config file in the current directory (see the **Configuration** section below for the lookup order). The flag must appear before any `--args-for` block.
 
 **Passing Arguments to Service Commands:**
 
@@ -183,8 +183,21 @@ services:
       # Frontend serving its built assets (e.g., when API depends on it)
       serve:
         type: cmd
-        preCommands: # Commands to run and await completion BEFORE the main command
-          - [npm, --prefix, frontend, run, build] # Build frontend assets first
+        # 'preCommands' run and complete BEFORE the main command starts.
+        # Each entry can be one of:
+        #   1. An array of strings — a literal command, run synchronously.
+        #        - [npm, --prefix, frontend, run, build]
+        #   2. An object — a literal command with options.
+        #        - { command: [npm, run, build], directory: ./frontend }
+        #   3. An object referencing another service+mode — runs that service to
+        #      completion (its own preCommands recurse; parallel commands run in
+        #      parallel and are all awaited). The target must be a `cmd`-type
+        #      mode. If multiple services reference the same `service:mode`
+        #      within a single `go-dev` invocation, it runs only ONCE and other
+        #      referrers await the same result.
+        #        - { service: main, mode: build }
+        preCommands:
+          - [npm, --prefix, frontend, run, build]
         commands:
           command: [node, ./localserver.mjs] # Then start the local server
           directory: ./frontend

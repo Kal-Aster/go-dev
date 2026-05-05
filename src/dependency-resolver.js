@@ -1,3 +1,5 @@
+const log = require('./logger');
+
 function resolveServiceExecutionGraph(config, presetName) {
   const preset = config.presets[presetName];
   if (!preset) {
@@ -28,7 +30,7 @@ function resolveServiceExecutionGraph(config, presetName) {
         return name === serviceName;
       });
       if (existingService != null) {
-        console.warn(
+        log.warn(
           `Ignoring dependency '${serviceName}' for '${dependentService}' because it is flagged to be run as service in mode '${existingService.mode}'.`
         );
         return;
@@ -38,7 +40,7 @@ function resolveServiceExecutionGraph(config, presetName) {
         return name === serviceName;
       });
       if (existingDependencyIndex >= 0) {
-        console.warn(
+        log.warn(
           `Removing service '${serviceName}' from dependencies because it is flagged to be run as service in mode '${dependencies[existingDependencyIndex].mode}'.`
         );
         dependencies.splice(existingDependencyIndex, 1);
@@ -86,7 +88,7 @@ function resolveServiceExecutionGraph(config, presetName) {
         return name === dependencyName;
       });
       if (existingDependencyIndex != null) {
-        console.warn(`Skipping dependency '${dependencyName}' for '${serviceName}' because it's already present in dependencies list.`);
+        log.warn(`Skipping dependency '${dependencyName}' for '${serviceName}' because it's already present in dependencies list.`);
         continue;
       }
 

@@ -1,4 +1,5 @@
 const { spawn, spawnSync, execSync } = require('child_process');
+const log = require('./logger');
 const prefixLines = require("./prefix-lines");
 
 const isWindows = process.platform === 'win32';
@@ -20,10 +21,10 @@ class ProcessManager {
    */
   runSync(command, args = [], options = {}) {
     if (this.cleanupInProgress) {
-      console.warn(`[ProcessManager] Skipping synchronous command '${command}' during cleanup.`);
+      log.warn(`[ProcessManager] Skipping synchronous command '${command}' during cleanup.`);
       return '';
     }
-    console.log(`[ProcessManager] Running sync: ${command} ${args.join(' ')}`);
+    log.debug(`[ProcessManager] Running sync: ${command} ${args.join(' ')}`);
     try {
       const result = spawnSync(command, args, {
         shell: true,
@@ -60,10 +61,10 @@ class ProcessManager {
   runInherited(command, args = [], options = {}) {
     return new Promise((resolve, reject) => {
       if (this.cleanupInProgress) {
-        console.warn(`[ProcessManager] Skipping inherited command '${command}' during cleanup.`);
+        log.warn(`[ProcessManager] Skipping inherited command '${command}' during cleanup.`);
         return resolve();
       }
-      console.log(`[ProcessManager] Running inherited: ${command} ${args.join(' ')}`);
+      log.debug(`[ProcessManager] Running inherited: ${command} ${args.join(' ')}`);
       const proc = spawn(command, args, {
         shell: true,
         stdio: 'inherit',
@@ -71,7 +72,7 @@ class ProcessManager {
       });
 
       proc.on('error', (err) => {
-        console.error(`[ProcessManager] Failed to start inherited command '${command}':`, err);
+        log.error(`[ProcessManager] Failed to start inherited command '${command}':`, err);
         reject(err);
       });
 
@@ -101,10 +102,10 @@ class ProcessManager {
    */
   startManagedProcess(command, args, options, prefix, restartOnError, onExit, processReference) {
     if (this.cleanupInProgress) {
-      console.warn(`[ProcessManager] Skipping managed process '${command}' during cleanup.`);
+      log.warn(`[ProcessManager] Skipping managed process '${command}' during cleanup.`);
       return null;
     }
-    console.log(
+    log.debug(
       `[ProcessManager] Starting managed process: ${command} ${args.join(
         ' ',
       )} (prefix: ${prefix})`,
@@ -118,6 +119,7 @@ class ProcessManager {
       shell: true,
       stdio: 'pipe',
       ...options,
+      env: { FORCE_COLOR: '1', ...process.env, ...(options.env ?? {}) },
     });
     processReference.process = startedProcess;
 
@@ -136,7 +138,7 @@ class ProcessManager {
     this.managedProcesses.add(startedProcess);
 
     startedProcess.on('error', (err) => {
-      console.error(
+      log.error(
         `[ProcessManager] Error starting managed process '${command}': ${err.message}`,
       );
       this.managedProcesses.delete(startedProcess);
@@ -149,18 +151,18 @@ class ProcessManager {
 
       this.managedProcesses.delete(startedProcess);
       if (this.cleanupInProgress) {
-        console.log(
+        log.debug(
           `[ProcessManager] Managed process '${command}' (PID: ${startedProcess.pid}) exited due to cleanup.`,
         );
         return;
       }
 
       if (code !== 0) {
-        console.error(
+        log.error(
           `[ProcessManager] Managed process '${command}' (PID: ${startedProcess.pid}) exited with code ${code}.`,
         );
         if (restartOnError) {
-          console.warn(
+          log.warn(
             `[ProcessManager] Restarting managed process '${command}'...`,
           );
           this.startManagedProcess(command, args, options, prefix, restartOnError, onExit, processReference);
@@ -168,7 +170,7 @@ class ProcessManager {
           onExit?.();
         }
       } else {
-        console.log(
+        log.debug(
           `[ProcessManager] Managed process '${command}' (PID: ${startedProcess.pid}) exited cleanly.`,
         );
         onExit?.();
@@ -220,11 +222,11 @@ class ProcessManager {
           return;
         }
 
-        console.error(`[ProcessManager] Timeout reached for process interruption ${childProcess.pid}`);
+        log.error(`[ProcessManager] Timeout reached for process interruption ${childProcess.pid}`);
         try {
           childProcess.kill('SIGKILL');
         } catch (e) {
-          console.error(`[ProcessManager] Error force killing process ${childProcess.pid}: ${e.message}`);
+          log.error(`[ProcessManager] Error force killing process ${childProcess.pid}: ${e.message}`);
         }
         resolve();
       }, 500);
@@ -232,7 +234,7 @@ class ProcessManager {
       try {
         childProcess.kill('SIGTERM');
       } catch (e) {
-        console.error(`[ProcessManager] Error signaling process ${childProcess.pid}: ${e.message}`);
+        log.error(`[ProcessManager] Error signaling process ${childProcess.pid}: ${e.message}`);
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
@@ -246,13 +248,13 @@ class ProcessManager {
    */
   async cleanupManagedProcesses() {
     if (this.cleanupInProgress) {
-      console.log('[ProcessManager] Cleanup of managed processes already in progress, skipping.');
+      log.debug('[ProcessManager] Cleanup of managed processes already in progress, skipping.');
       return;
     }
 
     this.cleanupInProgress = true;
 
-    console.log('\n[ProcessManager] Initiating cleanup of managed processes...');
+    log.debug('\n[ProcessManager] Initiating cleanup of managed processes...');
 
     // Filter out already-dead processes
     const processesToKill = [...this.managedProcesses].filter(proc => {
@@ -264,7 +266,7 @@ class ProcessManager {
     });
     
     for (const proc of processesToKill) {
-      console.log(`[ProcessManager] Killing managed process PID: ${proc.pid}`);
+      log.debug(`[ProcessManager] Killing managed process PID: ${proc.pid}`);
       try {
         if (isWindows) {
           // On Windows, use taskkill to kill the entire process tree
@@ -277,10 +279,10 @@ class ProcessManager {
           proc.kill('SIGTERM');
         }
       } catch (e) {
-        console.error(`[ProcessManager] Error killing process ${proc.pid}: ${e.message}`);
+        log.error(`[ProcessManager] Error killing process ${proc.pid}: ${e.message}`);
       }
     }
-    
+
     // On Unix, wait for processes to exit gracefully before using SIGKILL
     if (processesToKill.length > 0 && !isWindows) {
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -291,16 +293,16 @@ class ProcessManager {
           continue;
         }
 
-        console.warn(`[ProcessManager] Process ${proc.pid} did not exit gracefully, forcing kill.`);
+        log.warn(`[ProcessManager] Process ${proc.pid} did not exit gracefully, forcing kill.`);
         try {
           proc.kill('SIGKILL');
         } catch (e) {
-          console.error(`[ProcessManager] Error forcing kill for process ${proc.pid}: ${e.message}`);
+          log.error(`[ProcessManager] Error forcing kill for process ${proc.pid}: ${e.message}`);
         }
       }
     }
 
-    console.log('[ProcessManager] Managed process cleanup complete.');
+    log.debug('[ProcessManager] Managed process cleanup complete.');
   }
 }
 
