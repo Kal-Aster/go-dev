@@ -119,6 +119,7 @@ class ProcessManager {
       shell: true,
       stdio: 'pipe',
       ...options,
+      env: { FORCE_COLOR: '1', ...process.env, ...(options.env ?? {}) },
     });
     processReference.process = startedProcess;
 
