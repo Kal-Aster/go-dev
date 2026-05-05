@@ -1,10 +1,112 @@
 const { BaseService } = require('./base');
 
 class CmdService extends BaseService {
+  /**
+   * Per-process cache of in-flight or completed service-as-preCommand runs.
+   * Key: `${serviceName}:${resolvedMode}`. Value: Promise<void> for the run.
+   */
+  static _serviceCommandCache = new Map();
+
   constructor(name, mode, config, onExit, extraArgs) {
     super(name, mode, config, onExit, extraArgs);
     this.prefix = `${name}:${mode}:`;
     this.processes = [];
+  }
+
+  static _normalizeCommands(commands) {
+    if (Array.isArray(commands) && typeof commands[0] === 'string') {
+      return [{ command: commands, directory: undefined }];
+    }
+    if (Array.isArray(commands)) {
+      return commands.map(c => (Array.isArray(c)
+        ? { command: c, directory: undefined }
+        : { command: c.command, directory: c.directory }
+      ));
+    }
+    return [{ command: commands.command, directory: commands.directory }];
+  }
+
+  static _resolveServiceMode(serviceName, requestedMode) {
+    const allServices = BaseService._servicesMap;
+    const service = allServices?.[serviceName];
+    if (!service) {
+      throw new Error(`Service '${serviceName}' referenced as preCommand not found in configuration.`);
+    }
+    const mode = (service.type === 'hybrid'
+      ? requestedMode ?? service.defaultMode ?? 'dev'
+      : requestedMode ?? 'dev');
+    const config = (service.type === 'hybrid'
+      ? service.modes?.[mode]
+      : (mode === 'dev' ? service : undefined));
+    if (config == null) {
+      throw new Error(`Mode '${mode}' not found in service '${serviceName}'.`);
+    }
+    if (config.type !== 'cmd') {
+      throw new Error(
+        `preCommand service '${serviceName}:${mode}' must be of type 'cmd', got '${config.type}'.`,
+      );
+    }
+    return { mode, config };
+  }
+
+  static _runServiceAsPreCommand(serviceName, requestedMode, fromContext) {
+    const { mode, config } = CmdService._resolveServiceMode(serviceName, requestedMode);
+    const key = `${serviceName}:${mode}`;
+    const existing = CmdService._serviceCommandCache.get(key);
+    if (existing) {
+      console.log(`[${fromContext}] preCommand service '${key}' already in flight or completed; awaiting.`);
+      return existing;
+    }
+
+    const promise = (async () => {
+      const ctx = `${serviceName}:${mode}`;
+      console.log(`[${ctx}] Running as preCommand service...`);
+
+      if (config.preCommands && config.preCommands.length > 0) {
+        for (const pre of config.preCommands) {
+          await CmdService._runPreCommand(pre, ctx);
+        }
+      }
+
+      const normalized = CmdService._normalizeCommands(config.commands);
+      await Promise.all(normalized.map(({ command, directory }) => {
+        const [cmd, ...args] = command;
+        return CmdService._processManager.runInherited(cmd, args, { cwd: directory });
+      }));
+
+      console.log(`[${ctx}] preCommand service completed.`);
+    })();
+
+    CmdService._serviceCommandCache.set(key, promise);
+    return promise;
+  }
+
+  static async _runPreCommand(pre, fromContext) {
+    if (!Array.isArray(pre) && pre != null && typeof pre === 'object' && pre.service != null) {
+      try {
+        await CmdService._runServiceAsPreCommand(pre.service, pre.mode, fromContext);
+      } catch (error) {
+        throw new Error(
+          `[${fromContext}] Pre-command service '${pre.service}${pre.mode ? `:${pre.mode}` : ''}' failed: ${error.message}`,
+        );
+      }
+      return;
+    }
+
+    const { cmdArgs, directory } = (Array.isArray(pre)
+      ? { cmdArgs: pre }
+      : { cmdArgs: pre.command, directory: pre.directory });
+    try {
+      CmdService._processManager.runSync(cmdArgs[0], cmdArgs.slice(1), {
+        cwd: directory,
+        stdio: 'inherit',
+      });
+    } catch (error) {
+      console.log({ cmdArgs });
+      throw new Error(
+        `[${fromContext}] Pre-command failed: ${cmdArgs.join(' ')}: ${error.message}`,
+      );
+    }
   }
 
   async start() {
@@ -19,24 +121,8 @@ class CmdService extends BaseService {
 
     if (preCommands && preCommands.length > 0) {
       console.log(`[${this.name}:${this.mode}] Running pre-commands...`);
-      for (const command of preCommands) {
-        const { cmdArgs, directory } = (Array.isArray(command) ?
-          { cmdArgs: command } :
-          { cmdArgs: command.command, directory: command.directory }
-        );
-        try {
-          CmdService._processManager.runSync(cmdArgs[0], cmdArgs.slice(1), {
-            cwd: directory,
-            stdio: 'inherit',
-          });
-        } catch (error) {
-          console.log({ cmdArgs });
-          throw new Error(
-            `[${this.name}:${this.mode}] Pre-command failed: ${cmdArgs.join(
-              ' ',
-            )}: ${error.message}`,
-          );
-        }
+      for (const pre of preCommands) {
+        await CmdService._runPreCommand(pre, `${this.name}:${this.mode}`);
       }
       console.log(`[${this.name}:${this.mode}] Pre-commands completed.`);
     }

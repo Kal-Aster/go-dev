@@ -183,8 +183,21 @@ services:
       # Frontend serving its built assets (e.g., when API depends on it)
       serve:
         type: cmd
-        preCommands: # Commands to run and await completion BEFORE the main command
-          - [npm, --prefix, frontend, run, build] # Build frontend assets first
+        # 'preCommands' run and complete BEFORE the main command starts.
+        # Each entry can be one of:
+        #   1. An array of strings — a literal command, run synchronously.
+        #        - [npm, --prefix, frontend, run, build]
+        #   2. An object — a literal command with options.
+        #        - { command: [npm, run, build], directory: ./frontend }
+        #   3. An object referencing another service+mode — runs that service to
+        #      completion (its own preCommands recurse; parallel commands run in
+        #      parallel and are all awaited). The target must be a `cmd`-type
+        #      mode. If multiple services reference the same `service:mode`
+        #      within a single `go-dev` invocation, it runs only ONCE and other
+        #      referrers await the same result.
+        #        - { service: main, mode: build }
+        preCommands:
+          - [npm, --prefix, frontend, run, build]
         commands:
           command: [node, ./localserver.mjs] # Then start the local server
           directory: ./frontend

@@ -17,7 +17,7 @@ class Orchestrator {
     this.processManager = new ProcessManager();
     this.activeServiceInstances = new Map();
 
-    BaseService.initialize(this.processManager);
+    BaseService.initialize(this.processManager, this.config.services);
   }
 
   async start(presetName) {

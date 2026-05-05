@@ -2,17 +2,22 @@ class BaseService {
   /** @type {import("../process-manager")} */
   static _processManager = null;
 
+  /** @type {object | null} */
+  static _servicesMap = null;
+
   /**
-   * Initializes the shared ProcessManager for all service types.
+   * Initializes shared state for all service types.
    * This should be called once at application startup.
    * @param {import("../process-manager")} processManagerInstance
+   * @param {object} [servicesMap] - The full `services` block from the loaded config, keyed by service name.
    */
-  static initialize(processManagerInstance) {
+  static initialize(processManagerInstance, servicesMap) {
     if (BaseService._processManager) {
       console.warn('BaseService.initialize called multiple times. Skipping.');
       return;
     }
     BaseService._processManager = processManagerInstance;
+    BaseService._servicesMap = servicesMap ?? null;
   }
 
   /**

@@ -21,9 +21,19 @@ const commandConfigSchema = Joi.alternatives().try(
     commandObjectSchema
 );
 
+const serviceRefSchema = Joi.object({
+    service: Joi.string().min(1).required(),
+    mode: Joi.string().min(1).optional(),
+});
+const preCommandConfigSchema = Joi.alternatives().try(
+    commandSchema,
+    commandObjectSchema,
+    serviceRefSchema,
+);
+
 const cmdServiceConfigSchema = Joi.object({
   type: Joi.string().valid('cmd').required(),
-  preCommands: Joi.array().items(commandConfigSchema).default([]),
+  preCommands: Joi.array().items(preCommandConfigSchema).default([]),
   commands: Joi.alternatives().try(
     commandConfigSchema,
     Joi.array().items(commandObjectSchema).min(1)
