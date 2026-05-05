@@ -3,13 +3,17 @@
 const Orchestrator = require('../src/orchestrator');
 const path = require('path');
 
-const presetName = process.argv[2];
+const { parseCliArgs } = require('../src/cli-args');
+
+const { presetName, configPath, remaining } = parseCliArgs(process.argv.slice(2));
 
 if (!presetName) {
-    console.error('Error: Please specify a preset to run. Usage: dev-orchestrator <preset_name>');
+    console.error('Error: Please specify a preset to run. Usage: go-dev <preset_name> [-c|--config <path>] [--args-for ...]');
     process.exit(1);
 }
 
-const orchestrator = new Orchestrator();
+process.argv = [process.argv[0], process.argv[1], presetName, ...remaining];
+
+const orchestrator = new Orchestrator(configPath);
 
 orchestrator.start(presetName);

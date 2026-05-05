@@ -48,11 +48,11 @@ yarn add --dev go-dev
 Once installed, simply run `go-dev` with the name of the preset you want to start:
 
 ```bash
-npx go-dev <preset_name> [config_path]
+npx go-dev <preset_name> [-c|--config <path>]
 ```
 
 *   `<preset_name>`: The name of the preset defined in your `go-dev.yml` (e.g., `api`, `frontend`, `all`).
-*   `[config_path]`: (Optional) Path to your `go-dev.yml` file. Defaults to looking for `go-dev.yml`, `.go-dev.yml`, `go-dev.yaml`, or `.go-dev.yaml` in the current directory.
+*   `-c <path>` / `--config <path>` (also `-c=<path>` / `--config=<path>`): (Optional) Path to your `go-dev.yml` file. When omitted, `go-dev` auto-discovers a config file in the current directory (see the **Configuration** section below for the lookup order). The flag must appear before any `--args-for` block.
 
 **Passing Arguments to Service Commands:**
 
