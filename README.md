@@ -65,6 +65,8 @@ Running `go-dev` **without a preset** (in an interactive terminal) opens a full-
 
 A panel at the bottom shows the **resolved selection** split into sections — *primary services* and *dependencies* (each with its mode) — so you can see exactly what will start. On the **Services & Modes** tab it reflects the services you've checked; on the **Presets** tab, the highlighted preset.
 
+If the same service is pulled in under **two different modes** (e.g. `keplero:build` as a primary while another service depends on `keplero:dev`), the panel flags a *mode conflict*: go-dev runs one instance per service, so the losing mode is dropped and that dependency goes unmet. The same warning is printed at startup, so it's visible even when launching a preset by name without the TUI.
+
 Navigate tabs with <kbd>←</kbd>/<kbd>→</kbd>, move with <kbd>↑</kbd>/<kbd>↓</kbd>, and quit with <kbd>q</kbd>. When stdin is not a TTY (e.g. CI) and no preset is given, `go-dev` exits with an error instead of opening the TUI.
 
 **Passing Arguments to Service Commands:**

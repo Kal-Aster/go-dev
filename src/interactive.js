@@ -154,6 +154,18 @@ function runInteractive(config, { configPath, presetName } = {}) {
     } else {
       item('(nessuna)', (t) => term.gray(t));
     }
+
+    if (graph.conflicts.length) {
+      blank();
+      if (row < term.height - 1) term.moveTo(1, row++).styleReset().red('⚠ conflitti di modalità');
+      for (const { service, requests } of graph.conflicts) {
+        const where = requests
+          .map((r) => `${r.mode}${r.by ? ` (dip. di ${r.by})` : ' (primario)'}`)
+          .join(' vs ');
+        item(`${service}: ${where}`, (t) => term.yellow(t));
+      }
+      item('un solo avvio per servizio — alcune dipendenze restano non soddisfatte', (t) => term.gray(t));
+    }
   }
 
   function render() {
