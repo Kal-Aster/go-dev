@@ -1,6 +1,7 @@
 const log = require('../logger');
 const { BaseService } = require('./base');
 const { buildColoredPrefix, buildColoredTag } = require('../service-colors');
+const { waitForReady } = require('./ready-check');
 
 class CmdService extends BaseService {
   /**
@@ -220,6 +221,14 @@ class CmdService extends BaseService {
       this.processes.push(process);
       log.debug(
         `[${this.coloredId}] Process started (PID: ${process.process.pid}).`,
+      );
+    }
+
+    if (this.config.readyWhen) {
+      await waitForReady(
+        this.processes.map(({ process }) => process),
+        this.config.readyWhen,
+        this.coloredId,
       );
     }
   }

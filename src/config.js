@@ -31,6 +31,15 @@ const preCommandConfigSchema = Joi.alternatives().try(
     serviceRefSchema,
 );
 
+const readyWhenSchema = Joi.object({
+  logMatch: Joi.string().min(1),
+  file: Joi.string().min(1),
+  port: Joi.number().integer().min(1).max(65535),
+  host: Joi.string().min(1).default('127.0.0.1'),
+  timeoutMs: Joi.number().integer().min(0).default(60000),
+  pollIntervalMs: Joi.number().integer().min(50).default(500),
+}).or('logMatch', 'file', 'port');
+
 const cmdServiceConfigSchema = Joi.object({
   type: Joi.string().valid('cmd').required(),
   preCommands: Joi.array().items(preCommandConfigSchema).default([]),
@@ -41,6 +50,7 @@ const cmdServiceConfigSchema = Joi.object({
   defaultCommand: Joi.string().default('start'),
   directory: Joi.string(),
   dependencies: Joi.array().items(dependencyEntrySchema).default([]),
+  readyWhen: readyWhenSchema.optional(),
   healthCheck: Joi.boolean().default(false)
 });
 
