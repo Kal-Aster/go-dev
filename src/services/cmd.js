@@ -1,6 +1,7 @@
 const log = require('../logger');
 const { BaseService } = require('./base');
 const { buildColoredPrefix, buildColoredTag } = require('../service-colors');
+const { waitForReady } = require('./ready-check');
 
 class CmdService extends BaseService {
   /**
@@ -70,9 +71,11 @@ class CmdService extends BaseService {
       }
 
       const normalized = CmdService._normalizeCommands(config.commands);
-      await Promise.all(normalized.map(({ command, directory }) => {
+      const useIndex = normalized.length > 1;
+      await Promise.all(normalized.map(({ command, directory }, index) => {
         const [cmd, ...args] = command;
-        return CmdService._processManager.runInherited(cmd, args, { cwd: directory });
+        const prefix = buildColoredPrefix(serviceName, mode, useIndex ? index : null);
+        return CmdService._processManager.runInheritedPrefixed(cmd, args, { cwd: directory }, prefix);
       }));
 
       log.info(`[${ctx}] preCommand service completed.`);
@@ -98,10 +101,12 @@ class CmdService extends BaseService {
       ? { cmdArgs: pre }
       : { cmdArgs: pre.command, directory: pre.directory });
     try {
-      CmdService._processManager.runSync(cmdArgs[0], cmdArgs.slice(1), {
-        cwd: directory,
-        stdio: 'inherit',
-      });
+      await CmdService._processManager.runInheritedPrefixed(
+        cmdArgs[0],
+        cmdArgs.slice(1),
+        { cwd: directory },
+        fromContext,
+      );
     } catch (error) {
       log.debug({ cmdArgs });
       throw new Error(
@@ -220,6 +225,14 @@ class CmdService extends BaseService {
       this.processes.push(process);
       log.debug(
         `[${this.coloredId}] Process started (PID: ${process.process.pid}).`,
+      );
+    }
+
+    if (this.config.readyWhen) {
+      await waitForReady(
+        this.processes.map(({ process }) => process),
+        this.config.readyWhen,
+        this.coloredId,
       );
     }
   }

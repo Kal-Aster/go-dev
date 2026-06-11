@@ -14,7 +14,7 @@ In complex monorepos, starting your development environment can be a chore. You 
 
 *   **Unified Configuration:** Define all your services, their modes (e.g., `dev`, `docker`, `serve`), and dependencies in a single `go-dev.yml` file.
 *   **Service Types:**
-    *   **`cmd` services:** Run any command-line process (e.g., `npm run dev`, `rollup -w`, `python app.py`). Supports `preCommands` for setup tasks like builds. Commands can be defined in multiple flexible ways to run single or multiple processes in parallel for a service.
+    *   **`cmd` services:** Run any command-line process (e.g., `npm run dev`, `rollup -w`, `python app.py`). Supports `preCommands` for setup tasks like builds, and `readyWhen` to hold back dependents until the service is actually usable (log match, file, or open port). Commands can be defined in multiple flexible ways to run single or multiple processes in parallel for a service.
     *   **`docker` services:** Manage Docker containers via `docker compose`. Automatically checks container status and performs health checks.
 *   **Mode-Aware Dependencies:** Services can depend on other services running in specific modes (e.g., your `api` dev mode might depend on `frontend` in `serve` mode).
 *   **Preset-Driven Startup:** Define different "presets" (e.g., `api`, `frontend`, `all`) to easily spin up specific combinations of services tailored to your current development focus.
@@ -174,6 +174,17 @@ services:
         commands:
           command: [npx, rollup, -c, -w]
           directory: ./frontend
+        # 'readyWhen' holds back dependents until this (long-running) service is
+        # actually usable, instead of resolving as soon as the process spawns.
+        # This is the watch-mode counterpart of docker's 'healthCheck': prefer it
+        # over building shared artifacts again as a preCommand of every consumer.
+        # Provide at least one condition (multiple are combined with AND):
+        #   logMatch: "<regex>"   — ready when a line on stdout/stderr matches
+        #   file: ./dist/index.js — ready when the path exists on disk
+        #   port: 5173            — ready when a TCP connection succeeds
+        # Optional: host (default 127.0.0.1), timeoutMs (60000), pollIntervalMs (500).
+        readyWhen:
+          logMatch: "created .* in"   # rollup's "created dist/... in 1.2s"
         dependencies:
           # Frontend dev needs API (will use api's default docker mode for this preset)
           # Note: No direct circular dependency between dev modes.
