@@ -17,6 +17,7 @@
   "description": "",
   "dependencies": {
     "joi": "^17.13.3",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "terminal-kit": "^3.1.2"
   }
 }
