@@ -36,7 +36,7 @@ class Orchestrator {
    */
   async start(selection) {
     try {
-      const { dependencies, services: primaryServices } = resolveServiceExecutionGraph(
+      const { dependencies, services: primaryServices, conflicts } = resolveServiceExecutionGraph(
         this.config,
         selection,
       );
@@ -46,6 +46,17 @@ class Orchestrator {
       dependencies.forEach(s => log.info(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
       log.info(`\n${bold('Resolved primary services')}`);
       primaryServices.forEach(s => log.info(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
+
+      if (conflicts.length > 0) {
+        log.warn(`\n${bold('⚠ Mode conflicts')}`);
+        for (const { service, requests } of conflicts) {
+          const where = requests
+            .map(r => `${colorMode(service, r.mode)}${r.by ? ` (dep of ${r.by})` : ' (primary)'}`)
+            .join(' vs ');
+          log.warn(` - '${service}' requested in conflicting modes: ${where}.`);
+        }
+        log.warn(`   go-dev runs one instance per service, so some dependencies above may be unmet.`);
+      }
 
       const extraArgs = new Map();
       {

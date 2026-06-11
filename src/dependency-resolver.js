@@ -1,5 +1,3 @@
-const log = require('./logger');
-
 /**
  * Resolves a named preset to its `{ services, modes }` selection object,
  * throwing if it does not exist. This is the single place that maps a preset
@@ -23,12 +21,22 @@ function resolvePreset(config, presetName) {
  * @param {{ services: string[], modes?: Record<string, string> }} selection
  *   A service selection — same shape as a preset. May come from a preset
  *   (via {@link resolvePreset}) or be built interactively.
+ * @returns {{
+ *   services: { name: string, mode: string, config: object }[],
+ *   dependencies: { name: string, mode: string, config: object, requiredBy: string }[],
+ *   conflicts: { service: string, requests: { mode: string, by: string | null }[] }[]
+ * }} `conflicts` lists services pulled in under more than one mode (e.g. one as
+ *   a primary and another as a dependency). go-dev runs one instance per
+ *   service name, so a conflicting selection leaves some dependency unmet.
  */
 function resolveServiceExecutionGraph(config, selection) {
   const modes = selection.modes ?? {};
 
   const services = [];
   const dependencies = [];
+  // serviceName -> Map<mode, requestedBy|null> — every mode a service is asked
+  // to run in, regardless of which instance actually wins the dedup below.
+  const requests = new Map();
 
   for (const serviceName of selection.services) {
     addService(
@@ -38,39 +46,27 @@ function resolveServiceExecutionGraph(config, selection) {
     );
   }
 
-  return { dependencies, services };
+  const conflicts = [];
+  for (const [service, byMode] of requests) {
+    if (byMode.size > 1) {
+      conflicts.push({
+        service,
+        requests: [...byMode].map(([mode, by]) => ({ mode, by })),
+      });
+    }
+  }
 
-  function addService(serviceName, mode, dependentService) {
+  return { dependencies, services, conflicts };
+
+  function addService(serviceName, requestedMode, dependentService) {
     const service = config.services[serviceName];
     if (service == null) {
       throw new Error(`Service named '${serviceName}' not found in configuration.`);
     }
 
-    if (dependentService != null) {
-      const existingService = services.find(({ name }) => {
-        return name === serviceName;
-      });
-      if (existingService != null) {
-        log.warn(
-          `Ignoring dependency '${serviceName}' for '${dependentService}' because it is flagged to be run as service in mode '${existingService.mode}'.`
-        );
-        return;
-      }
-    } else {
-      const existingDependencyIndex = dependencies.findIndex(({ name }) => {
-        return name === serviceName;
-      });
-      if (existingDependencyIndex >= 0) {
-        log.warn(
-          `Removing service '${serviceName}' from dependencies because it is flagged to be run as service in mode '${dependencies[existingDependencyIndex].mode}'.`
-        );
-        dependencies.splice(existingDependencyIndex, 1);
-      }
-    }
-
-    mode = (service.type === 'hybrid' ?
-      mode ?? service.defaultMode ?? 'dev' :
-      mode ?? 'dev'
+    const mode = (service.type === 'hybrid' ?
+      requestedMode ?? service.defaultMode ?? 'dev' :
+      requestedMode ?? 'dev'
     );
     const serviceConfig = (service.type === 'hybrid' ?
       service.modes[mode] :
@@ -81,18 +77,29 @@ function resolveServiceExecutionGraph(config, selection) {
       throw new Error(`Mode named '${mode}' not found in service '${serviceName}'.`);
     }
 
-    if (dependentService == null) {
-      services.push({
-        name: serviceName,
-        mode,
-        config: serviceConfig,
-      });
+    // Record the requested mode so conflicting selections can be flagged later,
+    // even for the instance that loses the dedup below.
+    let requested = requests.get(serviceName);
+    if (!requested) {
+      requests.set(serviceName, requested = new Map());
+    }
+    if (!requested.has(mode)) {
+      requested.set(mode, dependentService ?? null);
+    }
+
+    if (dependentService != null) {
+      // One instance per service name: if it's already scheduled (as a primary
+      // or another dependency), keep the first. Mode mismatches surface via
+      // `conflicts`, not by silently swapping the running mode.
+      if (services.some(({ name }) => name === serviceName)) return;
+      if (dependencies.some(({ name }) => name === serviceName)) return;
+      dependencies.unshift({ name: serviceName, mode, config: serviceConfig, requiredBy: dependentService });
     } else {
-      dependencies.unshift({
-        name: serviceName,
-        mode,
-        config: serviceConfig,
-      });
+      const existingDependencyIndex = dependencies.findIndex(({ name }) => name === serviceName);
+      if (existingDependencyIndex >= 0) {
+        dependencies.splice(existingDependencyIndex, 1); // promote dependency -> primary
+      }
+      services.push({ name: serviceName, mode, config: serviceConfig });
     }
 
     for (let index = serviceConfig.dependencies.length - 1; index >= 0; index--) {
@@ -104,14 +111,6 @@ function resolveServiceExecutionGraph(config, selection) {
         { service: dependency, mode: 'dev' } :
         dependency
       );
-
-      const existingDependencyIndex = dependencies.find(({ name }) => {
-        return name === dependencyName;
-      });
-      if (existingDependencyIndex != null) {
-        log.warn(`Skipping dependency '${dependencyName}' for '${serviceName}' because it's already present in dependencies list.`);
-        continue;
-      }
 
       addService(
         dependencyName,
