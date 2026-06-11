@@ -141,4 +141,4 @@ function loadConfig(configPath) {
   return value;
 }
 
-module.exports = { loadConfig };
+module.exports = { loadConfig, findConfigFile };

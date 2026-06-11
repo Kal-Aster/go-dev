@@ -1,18 +1,39 @@
 const log = require('./logger');
 
-function resolveServiceExecutionGraph(config, presetName) {
+/**
+ * Resolves a named preset to its `{ services, modes }` selection object,
+ * throwing if it does not exist. This is the single place that maps a preset
+ * name to data — everything downstream operates on the selection object, so a
+ * preset is just one way (alongside the interactive TUI) to produce one.
+ *
+ * @param {object} config
+ * @param {string} presetName
+ * @returns {{ services: string[], modes: Record<string, string> }}
+ */
+function resolvePreset(config, presetName) {
   const preset = config.presets[presetName];
   if (!preset) {
     throw new Error(`Preset '${presetName}' not found in configuration.`);
   }
+  return preset;
+}
+
+/**
+ * @param {object} config
+ * @param {{ services: string[], modes?: Record<string, string> }} selection
+ *   A service selection — same shape as a preset. May come from a preset
+ *   (via {@link resolvePreset}) or be built interactively.
+ */
+function resolveServiceExecutionGraph(config, selection) {
+  const modes = selection.modes ?? {};
 
   const services = [];
   const dependencies = [];
 
-  for (const serviceName of preset.services) {
+  for (const serviceName of selection.services) {
     addService(
       serviceName,
-      preset.modes[serviceName],
+      modes[serviceName],
       null,
     );
   }
@@ -101,4 +122,4 @@ function resolveServiceExecutionGraph(config, presetName) {
   }
 }
 
-module.exports = { resolveServiceExecutionGraph };
+module.exports = { resolveServiceExecutionGraph, resolvePreset };

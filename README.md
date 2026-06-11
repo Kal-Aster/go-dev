@@ -18,6 +18,7 @@ In complex monorepos, starting your development environment can be a chore. You 
     *   **`docker` services:** Manage Docker containers via `docker compose`. Automatically checks container status and performs health checks.
 *   **Mode-Aware Dependencies:** Services can depend on other services running in specific modes (e.g., your `api` dev mode might depend on `frontend` in `serve` mode).
 *   **Preset-Driven Startup:** Define different "presets" (e.g., `api`, `frontend`, `all`) to easily spin up specific combinations of services tailored to your current development focus.
+*   **Interactive Selection (no preset required):** Run `go-dev` with no preset to open a full-screen TUI where you can pick a preset *or* compose a custom selection — toggle services and choose a mode per service — and optionally save that selection as a new preset. Presets become a convenience, not a requirement.
 *   **Automatic Dependency Resolution:** `go-dev` builds an intelligent execution graph, starting services in the correct topological order.
 *   **Centralized Logging:** Prefixes logs from each service, making it easy to follow activity from multiple concurrent processes.
 *   **Automatic Process Exit:** The `go-dev` process will automatically exit when all primary services (those directly listed in the chosen preset) exit cleanly (with a success code of `0`).
@@ -48,11 +49,21 @@ yarn add --dev go-dev
 Once installed, simply run `go-dev` with the name of the preset you want to start:
 
 ```bash
-npx go-dev <preset_name> [-c|--config <path>]
+npx go-dev [preset_name] [-c|--config <path>] [-i|--interactive]
 ```
 
-*   `<preset_name>`: The name of the preset defined in your `go-dev.yml` (e.g., `api`, `frontend`, `all`).
+*   `[preset_name]`: (Optional) The name of the preset defined in your `go-dev.yml` (e.g., `api`, `frontend`, `all`). When omitted, `go-dev` opens the interactive selector (see below).
 *   `-c <path>` / `--config <path>` (also `-c=<path>` / `--config=<path>`): (Optional) Path to your `go-dev.yml` file. When omitted, `go-dev` auto-discovers a config file in the current directory (see the **Configuration** section below for the lookup order). The flag must appear before any `--args-for` block.
+*   `-i` / `--interactive`: (Optional) Force the interactive selector even when a preset is given, pre-populating it from that preset so you can tweak the selection before starting.
+
+### Interactive selection
+
+Running `go-dev` **without a preset** (in an interactive terminal) opens a full-screen TUI with two tabs:
+
+*   **Presets** — pick an existing preset and press <kbd>Enter</kbd> to start it.
+*   **Services & Modes** — toggle services with <kbd>Space</kbd>, cycle the mode of a hybrid service with <kbd>m</kbd>, then press <kbd>Enter</kbd>. You'll be offered to save the selection as a new preset (written back to your config, preserving comments).
+
+Navigate tabs with <kbd>←</kbd>/<kbd>→</kbd>, move with <kbd>↑</kbd>/<kbd>↓</kbd>, and quit with <kbd>q</kbd>. When stdin is not a TTY (e.g. CI) and no preset is given, `go-dev` exits with an error instead of opening the TUI.
 
 **Passing Arguments to Service Commands:**
 
