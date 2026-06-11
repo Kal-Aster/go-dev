@@ -215,7 +215,7 @@ function runInteractive(config, { configPath, presetName } = {}) {
       // Services & Modes tab
       const svc = serviceNames[cursor];
       if (!svc) return;
-      if (name === 'SPACE') {
+      if (name === ' ' || name === 'SPACE') {
         if (selected.has(svc)) selected.delete(svc);
         else selected.add(svc);
         return render();
