@@ -40,8 +40,8 @@ function runInteractive(config, { configPath, presetName } = {}) {
     for (const [s, m] of Object.entries(preset.modes ?? {})) chosenMode.set(s, m);
   }
 
-  const TABS = ['Presets', 'Services & Modes'];
-  let activeTab = presetNames.length > 0 && !presetName ? 0 : 1;
+  const TABS = ['Services & Modes', 'Presets'];
+  let activeTab = 0; // land on Services & Modes; Tab switches to Presets
   let cursor = 0;
   let message = '';
 
@@ -94,8 +94,8 @@ function runInteractive(config, { configPath, presetName } = {}) {
   function render() {
     term.clear();
     drawHeader();
-    if (activeTab === 0) drawPresets();
-    else drawServices();
+    if (activeTab === 0) drawServices();
+    else drawPresets();
 
     if (message) {
       term.moveTo(1, term.height - 1).styleReset().yellow(message);
@@ -107,7 +107,7 @@ function runInteractive(config, { configPath, presetName } = {}) {
 
   // --- helpers -------------------------------------------------------------
   function currentList() {
-    return activeTab === 0 ? presetNames : serviceNames;
+    return activeTab === 0 ? serviceNames : presetNames;
   }
 
   function cycleMode(name) {
@@ -198,7 +198,8 @@ function runInteractive(config, { configPath, presetName } = {}) {
         return render();
       }
 
-      if (activeTab === 0) {
+      if (activeTab === 1) {
+        // Presets tab
         if (name === 'ENTER') {
           const preset = presetNames[cursor];
           if (!preset) return;
