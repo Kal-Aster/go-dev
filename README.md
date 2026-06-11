@@ -63,7 +63,7 @@ Running `go-dev` **without a preset** (in an interactive terminal) opens a full-
 *   **Services & Modes** — toggle services with <kbd>Space</kbd>, cycle the mode of a hybrid service with <kbd>m</kbd>, then press <kbd>Enter</kbd>. You'll be offered to save the selection as a new preset (written back to your config, preserving comments).
 *   **Presets** — pick an existing preset and press <kbd>Enter</kbd> to start it.
 
-A panel at the bottom shows the **resolved selection** split into sections — *primary services*, *dependencies*, and any service-referencing *preCommands* (each with its mode). On the **Services & Modes** tab it reflects the services you've checked; on the **Presets** tab, the highlighted preset.
+A panel at the bottom shows the **resolved selection** split into sections — *primary services* and *dependencies* (each with its mode) — so you can see exactly what will start. On the **Services & Modes** tab it reflects the services you've checked; on the **Presets** tab, the highlighted preset.
 
 Navigate tabs with <kbd>←</kbd>/<kbd>→</kbd>, move with <kbd>↑</kbd>/<kbd>↓</kbd>, and quit with <kbd>q</kbd>. When stdin is not a TTY (e.g. CI) and no preset is given, `go-dev` exits with an error instead of opening the TUI.
 

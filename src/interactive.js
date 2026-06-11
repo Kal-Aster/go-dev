@@ -1,6 +1,6 @@
 const termkit = require('terminal-kit');
 const { savePreset } = require('./save-preset');
-const { summarizeSelection } = require('./dependency-resolver');
+const { resolveServiceExecutionGraph } = require('./dependency-resolver');
 const log = require('./logger');
 
 /**
@@ -116,11 +116,11 @@ function runInteractive(config, { configPath, presetName } = {}) {
     const selection = panelSelection();
     if (!selection) return;
 
-    let summary;
+    let graph;
     const previousLevel = log.getLogLevel();
     try {
       log.setLogLevel('error'); // silence resolver dedup warnings while previewing
-      summary = summarizeSelection(config, selection);
+      graph = resolveServiceExecutionGraph(config, selection);
     } catch (error) {
       term.moveTo(3, top + 1).styleReset().red(`⚠ ${error.message}`);
       return;
@@ -141,24 +141,18 @@ function runInteractive(config, { configPath, presetName } = {}) {
     const blank = () => { row++; };
 
     header('servizi principali');
-    if (summary.primary.length) {
-      summary.primary.forEach((s) => item(`${s.name}:${s.mode}`, (t) => term.brightWhite(t)));
+    if (graph.services.length) {
+      graph.services.forEach((s) => item(`${s.name}:${s.mode}`, (t) => term.brightWhite(t)));
     } else {
       item(activeTab === 0 ? '(nessun servizio selezionato)' : '(nessuno)', (t) => term.gray(t));
     }
 
     blank();
     header('dipendenze');
-    if (summary.dependencies.length) {
-      summary.dependencies.forEach((d) => item(`${d.name}:${d.mode}`, (t) => term.white(t)));
+    if (graph.dependencies.length) {
+      graph.dependencies.forEach((d) => item(`${d.name}:${d.mode}`, (t) => term.white(t)));
     } else {
       item('(nessuna)', (t) => term.gray(t));
-    }
-
-    if (summary.preCommands.length) {
-      blank();
-      header('preCommand (setup)');
-      summary.preCommands.forEach((p) => item(`${p.name}:${p.mode}   (da ${p.from})`, (t) => term.yellow(t)));
     }
   }
 
