@@ -16,6 +16,7 @@ const bold = (text) => `\x1b[1m${text}\x1b[0m`;
 
 class Orchestrator {
   constructor(configPath, options = {}) {
+    this.configPath = configPath;
     this.config = loadConfig(configPath);
 
     const level = options.logLevel ?? this.config.logLevel;
@@ -29,14 +30,18 @@ class Orchestrator {
     BaseService.initialize(this.processManager, this.config.services);
   }
 
-  async start(presetName) {
+  /**
+   * @param {{ name?: string, services: string[], modes?: Record<string, string> }} selection
+   *   The service selection to run — from a preset or built interactively.
+   */
+  async start(selection) {
     try {
       const { dependencies, services: primaryServices } = resolveServiceExecutionGraph(
         this.config,
-        presetName,
+        selection,
       );
 
-      log.info(bold(`Preset: ${presetName}`));
+      log.info(bold(`Preset: ${selection.name ?? 'selezione personalizzata'}`));
       log.info(`\n${bold('Resolved dependencies')}`);
       dependencies.forEach(s => log.info(` - ${colorService(s.name, s.mode)} (mode: ${colorMode(s.name, s.mode)})`));
       log.info(`\n${bold('Resolved primary services')}`);
@@ -61,7 +66,7 @@ class Orchestrator {
             }
             if (currentService == null) {
               if (isGettingService === false) {
-                throw new Error(`Invalid arguments, use format: npx go-dev ${presetName} ${serviceArgsKeyword} <service> <args>`);
+                throw new Error(`Invalid arguments, use format: npx go-dev ${selection.name ?? '<preset>'} ${serviceArgsKeyword} <service> <args>`);
               }
 
               const splitArg = arg.split(':');

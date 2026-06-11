@@ -5,18 +5,20 @@
  *   <preset>                                   — positional preset name (first non-flag arg)
  *   -c <path>,  --config <path>,  -c=<path>,    --config=<path>
  *   -l <level>, --log-level <level>, -l=<lvl>,  --log-level=<lvl>
+ *   -i,         --interactive                   — force the interactive TUI even when a preset is given
  *
  * Flags are only interpreted before the first `--args-for` token. Everything
  * from `--args-for` onward is preserved verbatim in `remaining` so the
  * orchestrator's per-service args parser can consume it untouched.
  *
  * @param {string[]} argv - argv tail (already stripped of node + script path).
- * @returns {{ presetName?: string, configPath?: string, logLevel?: string, remaining: string[] }}
+ * @returns {{ presetName?: string, configPath?: string, logLevel?: string, interactive: boolean, remaining: string[] }}
  */
 function parseCliArgs(argv) {
   let presetName;
   let configPath;
   let logLevel;
+  let interactive = false;
   const remaining = [];
 
   let i = 0;
@@ -65,6 +67,11 @@ function parseCliArgs(argv) {
       continue;
     }
 
+    if (arg === '-i' || arg === '--interactive') {
+      interactive = true;
+      continue;
+    }
+
     if (presetName == null && !arg.startsWith('-')) {
       presetName = arg;
       continue;
@@ -77,7 +84,7 @@ function parseCliArgs(argv) {
     remaining.push(argv[i]);
   }
 
-  return { presetName, configPath, logLevel, remaining };
+  return { presetName, configPath, logLevel, interactive, remaining };
 }
 
 module.exports = { parseCliArgs };

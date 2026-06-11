@@ -1,0 +1,14 @@
+{
+  "name": "spike-opentui",
+  "private": true,
+  "version": "0.0.0",
+  "description": "go-dev TUI spike — OpenTUI core (non-React, Zig-backed)",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@opentui/core": "latest"
+  }
+}

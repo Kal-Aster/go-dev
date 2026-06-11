@@ -1,0 +1,13 @@
+{
+  "name": "spike-terminal-kit",
+  "private": true,
+  "version": "0.0.0",
+  "description": "go-dev TUI spike — terminal-kit (pure JS, non-React)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "terminal-kit": "^3.1.2"
+  }
+}
