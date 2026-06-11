@@ -1,5 +1,7 @@
 const termkit = require('terminal-kit');
 const { savePreset } = require('./save-preset');
+const { summarizeSelection } = require('./dependency-resolver');
+const log = require('./logger');
 
 /**
  * Full-screen interactive selection TUI (terminal-kit).
@@ -91,11 +93,66 @@ function runInteractive(config, { configPath, presetName } = {}) {
     });
   }
 
+  // Selection the bottom panel previews for the highlighted item.
+  function previewSelection() {
+    if (activeTab === 0) {
+      const svc = serviceNames[cursor];
+      if (!svc) return null;
+      return {
+        title: `servizio "${svc}"`,
+        selection: { services: [svc], modes: isHybrid(svc) ? { [svc]: chosenMode.get(svc) } : {} },
+      };
+    }
+    const preset = presetNames[cursor];
+    if (!preset) return null;
+    return {
+      title: `preset "${preset}"`,
+      selection: { services: config.presets[preset].services, modes: config.presets[preset].modes ?? {} },
+    };
+  }
+
+  // Bottom panel: full resolved list (primary + dependencies + preCommand
+  // services) for whatever item is highlighted, on either tab.
+  function drawPanel(top) {
+    term.moveTo(1, top).styleReset().gray('─'.repeat(Math.min(term.width, 64)));
+
+    const preview = previewSelection();
+    if (!preview) return;
+
+    let summary;
+    const previousLevel = log.getLogLevel();
+    try {
+      log.setLogLevel('error'); // silence resolver dedup warnings while previewing
+      summary = summarizeSelection(config, preview.selection);
+    } catch (error) {
+      term.moveTo(3, top + 1).styleReset().red(`⚠ ${error.message}`);
+      return;
+    } finally {
+      log.setLogLevel(previousLevel);
+    }
+
+    term.moveTo(1, top + 1).styleReset().bold(`Avvia (${preview.title}):`);
+
+    let row = top + 2;
+    const put = (label, style) => {
+      if (row >= term.height - 1) return;
+      term.moveTo(3, row++).styleReset();
+      style(label);
+    };
+    for (const s of summary.primary) put(`${s.name}:${s.mode}   (primario)`, (t) => term.brightWhite(t));
+    for (const d of summary.dependencies) put(`${d.name}:${d.mode}   (dipendenza)`, (t) => term.white(t));
+    for (const p of summary.preCommands) put(`${p.name}:${p.mode}   (preCommand di ${p.from})`, (t) => term.yellow(t));
+    if (summary.primary.length === 0) put('(nessun servizio)', (t) => term.gray(t));
+  }
+
   function render() {
     term.clear();
     drawHeader();
     if (activeTab === 0) drawServices();
     else drawPresets();
+
+    const panelTop = 6 + Math.max(serviceNames.length, presetNames.length, 1) + 1;
+    drawPanel(panelTop);
 
     if (message) {
       term.moveTo(1, term.height - 1).styleReset().yellow(message);

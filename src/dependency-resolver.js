@@ -122,4 +122,42 @@ function resolveServiceExecutionGraph(config, selection) {
   }
 }
 
-module.exports = { resolveServiceExecutionGraph, resolvePreset };
+/**
+ * Summarizes what a selection actually starts: the resolved primary services,
+ * their transitive dependencies, and any service-referencing preCommands (which
+ * run as setup steps and aren't part of the dependency graph). Useful for
+ * previewing a preset/service before launching it.
+ *
+ * Note: this calls {@link resolveServiceExecutionGraph}, which may emit
+ * `log.warn` for dedup cases — silence the logger around the call if a clean
+ * output is required (e.g. inside a full-screen TUI).
+ *
+ * @param {object} config
+ * @param {{ services: string[], modes?: Record<string, string> }} selection
+ * @returns {{ primary: object[], dependencies: object[], preCommands: { name: string, mode: string, from: string }[] }}
+ */
+function summarizeSelection(config, selection) {
+  const { dependencies, services } = resolveServiceExecutionGraph(config, selection);
+
+  const preCommands = [];
+  const seen = new Set();
+  for (const entry of [...services, ...dependencies]) {
+    for (const pre of entry.config.preCommands ?? []) {
+      const isServiceRef = pre && typeof pre === 'object' && !Array.isArray(pre) && pre.service;
+      if (!isServiceRef) {
+        continue;
+      }
+      const mode = pre.mode ?? 'dev';
+      const key = `${pre.service}:${mode}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      preCommands.push({ name: pre.service, mode, from: entry.name });
+    }
+  }
+
+  return { primary: services, dependencies, preCommands };
+}
+
+module.exports = { resolveServiceExecutionGraph, resolvePreset, summarizeSelection };
