@@ -89,6 +89,56 @@ class ProcessManager {
   }
 
   /**
+   * Runs a command asynchronously, prefixing its output like a managed process.
+   * Used for pre-commands (literal or service-as-preCommand) so their output is
+   * attributed to the owning service instead of leaking raw to the terminal.
+   * @param {string} command - The command to execute.
+   * @param {string[]} args - Arguments for the command.
+   * @param {object} [options={}] - Options for spawn (e.g., cwd).
+   * @param {string} prefix - Prefix for stdout/stderr lines.
+   * @returns {Promise<void>} Resolves when the process exits successfully.
+   */
+  runInheritedPrefixed(command, args = [], options = {}, prefix) {
+    return new Promise((resolve, reject) => {
+      if (this.cleanupInProgress) {
+        log.warn(`[ProcessManager] Skipping inherited command '${command}' during cleanup.`);
+        return resolve();
+      }
+      log.debug(`[ProcessManager] Running inherited (prefixed): ${command} ${args.join(' ')}`);
+      const proc = spawn(command, args, {
+        shell: true,
+        stdio: 'pipe',
+        ...options,
+        env: { FORCE_COLOR: '1', ...process.env, ...(options.env ?? {}) },
+      });
+
+      let lastFormatting = '';
+      const writePrefixed = (data, target) => {
+        const result = prefixLines(data.toString(), prefix, lastFormatting);
+        lastFormatting = result.lastFormatting;
+        target.write(result.prefixedText);
+      };
+      proc.stdout.on('data', (data) => writePrefixed(data, process.stdout));
+      proc.stderr.on('data', (data) => writePrefixed(data, process.stderr));
+
+      proc.on('error', (err) => {
+        log.error(`[ProcessManager] Failed to start inherited command '${command}':`, err);
+        reject(err);
+      });
+
+      proc.on('exit', (code) => {
+        if (code !== 0) {
+          reject(
+            new Error(`Inherited command '${command}' exited with code ${code}`),
+          );
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
    * Starts a long-running, managed process (like 'npx rollup -w').
    * Its output is prefixed, and it can be configured to restart on exit.
    * @param {string} command - The command to execute.
