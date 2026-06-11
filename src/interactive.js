@@ -93,37 +93,34 @@ function runInteractive(config, { configPath, presetName } = {}) {
     });
   }
 
-  // Selection the bottom panel previews for the highlighted item.
-  function previewSelection() {
+  // Selection the bottom panel previews. On the Services tab it reflects the
+  // *checked* services (not the cursor); on the Presets tab, the highlighted preset.
+  function panelSelection() {
     if (activeTab === 0) {
-      const svc = serviceNames[cursor];
-      if (!svc) return null;
-      return {
-        title: `servizio "${svc}"`,
-        selection: { services: [svc], modes: isHybrid(svc) ? { [svc]: chosenMode.get(svc) } : {} },
-      };
+      const services = serviceNames.filter((s) => selected.has(s));
+      const modes = {};
+      for (const s of services) {
+        if (isHybrid(s)) modes[s] = chosenMode.get(s);
+      }
+      return { services, modes };
     }
     const preset = presetNames[cursor];
     if (!preset) return null;
-    return {
-      title: `preset "${preset}"`,
-      selection: { services: config.presets[preset].services, modes: config.presets[preset].modes ?? {} },
-    };
+    return { services: config.presets[preset].services, modes: config.presets[preset].modes ?? {} };
   }
 
-  // Bottom panel: full resolved list (primary + dependencies + preCommand
-  // services) for whatever item is highlighted, on either tab.
+  // Bottom panel: the resolved selection split into labelled sections.
   function drawPanel(top) {
     term.moveTo(1, top).styleReset().gray('─'.repeat(Math.min(term.width, 64)));
 
-    const preview = previewSelection();
-    if (!preview) return;
+    const selection = panelSelection();
+    if (!selection) return;
 
     let summary;
     const previousLevel = log.getLogLevel();
     try {
       log.setLogLevel('error'); // silence resolver dedup warnings while previewing
-      summary = summarizeSelection(config, preview.selection);
+      summary = summarizeSelection(config, selection);
     } catch (error) {
       term.moveTo(3, top + 1).styleReset().red(`⚠ ${error.message}`);
       return;
@@ -131,18 +128,38 @@ function runInteractive(config, { configPath, presetName } = {}) {
       log.setLogLevel(previousLevel);
     }
 
-    term.moveTo(1, top + 1).styleReset().bold(`Avvia (${preview.title}):`);
-
-    let row = top + 2;
-    const put = (label, style) => {
+    let row = top + 1;
+    const header = (label) => {
+      if (row >= term.height - 1) return;
+      term.moveTo(1, row++).styleReset().bold(label);
+    };
+    const item = (label, style) => {
       if (row >= term.height - 1) return;
       term.moveTo(3, row++).styleReset();
       style(label);
     };
-    for (const s of summary.primary) put(`${s.name}:${s.mode}   (primario)`, (t) => term.brightWhite(t));
-    for (const d of summary.dependencies) put(`${d.name}:${d.mode}   (dipendenza)`, (t) => term.white(t));
-    for (const p of summary.preCommands) put(`${p.name}:${p.mode}   (preCommand di ${p.from})`, (t) => term.yellow(t));
-    if (summary.primary.length === 0) put('(nessun servizio)', (t) => term.gray(t));
+    const blank = () => { row++; };
+
+    header('servizi principali');
+    if (summary.primary.length) {
+      summary.primary.forEach((s) => item(`${s.name}:${s.mode}`, (t) => term.brightWhite(t)));
+    } else {
+      item(activeTab === 0 ? '(nessun servizio selezionato)' : '(nessuno)', (t) => term.gray(t));
+    }
+
+    blank();
+    header('dipendenze');
+    if (summary.dependencies.length) {
+      summary.dependencies.forEach((d) => item(`${d.name}:${d.mode}`, (t) => term.white(t)));
+    } else {
+      item('(nessuna)', (t) => term.gray(t));
+    }
+
+    if (summary.preCommands.length) {
+      blank();
+      header('preCommand (setup)');
+      summary.preCommands.forEach((p) => item(`${p.name}:${p.mode}   (da ${p.from})`, (t) => term.yellow(t)));
+    }
   }
 
   function render() {
