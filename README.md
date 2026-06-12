@@ -69,6 +69,8 @@ If the same service is pulled in under **two different modes** (e.g. `keplero:bu
 
 Navigate tabs with <kbd>←</kbd>/<kbd>→</kbd>, move with <kbd>↑</kbd>/<kbd>↓</kbd>, and quit with <kbd>q</kbd>. When stdin is not a TTY (e.g. CI) and no preset is given, `go-dev` exits with an error instead of opening the TUI.
 
+The selector **remembers your last launched selection per config file** and restores it the next time you open it. This state is stored in your user state directory (`$XDG_STATE_HOME/go-dev/` on Linux/macOS, `%LOCALAPPDATA%\go-dev\` on Windows), keyed by the config file's canonical absolute path — **never written into your repo**.
+
 **Passing Arguments to Service Commands:**
 
 To pass additional arguments from the command line to a specific service command, use a keyword flag followed by the target and its arguments.
