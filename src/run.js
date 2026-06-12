@@ -3,6 +3,7 @@ const { parseCliArgs } = require('./cli-args');
 const { findConfigFile } = require('./config');
 const { resolvePreset } = require('./dependency-resolver');
 const { runInteractive } = require('./interactive');
+const { saveLastSelection } = require('./last-selection');
 const log = require('./logger');
 
 /**
@@ -40,6 +41,10 @@ async function run(argv) {
     } else {
       selection = { name: presetName, ...resolvePreset(orchestrator.config, presetName) };
     }
+
+    // Remember this selection (per config, in the user's state dir — never in
+    // the consumer's repo) so the interactive selector can restore it next time.
+    saveLastSelection(resolvedConfigPath, selection);
 
     // Keep `remaining` (the `--args-for ...` tail) at argv index >= 3, where the
     // orchestrator's per-service args parser reads it. Index 2 is unused there.
