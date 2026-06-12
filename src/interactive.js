@@ -209,12 +209,21 @@ function runInteractive(config, { configPath, presetName } = {}) {
   // --- lifecycle -----------------------------------------------------------
   return new Promise((resolve) => {
     let finished = false;
+    let inPrompt = false; // true while terminal-kit's save prompts own the screen
 
     function cleanup() {
       term.removeListener('key', onKey);
+      term.removeListener('resize', onResize);
       term.grabInput(false);
       term.hideCursor(false);
       term.fullscreen(false);
+    }
+
+    // terminal-kit updates term.width/term.height before emitting 'resize';
+    // render() recomputes its layout from those, so a full redraw is enough.
+    function onResize() {
+      if (finished || inPrompt) return;
+      render();
     }
 
     function finish(result) {
@@ -232,6 +241,7 @@ function runInteractive(config, { configPath, presetName } = {}) {
       }
 
       // Hand input over to terminal-kit's prompt helpers for the save flow.
+      inPrompt = true;
       term.removeListener('key', onKey);
       term.hideCursor(false);
 
@@ -311,6 +321,7 @@ function runInteractive(config, { configPath, presetName } = {}) {
     term.grabInput(true);
     term.hideCursor(true);
     term.on('key', onKey);
+    term.on('resize', onResize);
     render();
   });
 }
